@@ -6,10 +6,10 @@
 	url = https://github.com/brofield/simpleini
 [submodule "thirdparty/GTAVMenuBase"]
 	path = thirdparty/GTAVMenuBase
-	url = https://github.com/E66666666/GTAVMenuBase
+	url = https://github.com/ikt32/GTAVMenuBase
 [submodule "thirdparty/GTAVDashHook"]
 	path = thirdparty/GTAVDashHook
-	url = https://github.com/E66666666/GTAVDashHook
+	url = https://github.com/ikt32/GTAVDashHook
 [submodule "thirdparty/yaml-cpp"]
 	path = thirdparty/yaml-cpp
 	url = https://github.com/jbeder/yaml-cpp

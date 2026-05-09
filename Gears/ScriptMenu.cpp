@@ -3,6 +3,8 @@
 #include "GitInfo.h"
 #include "InputConfiguration.h"
 #include "ScriptMenuUtils.h"
+
+#include "LanguageManager.h"
 #include "ScriptSettings.hpp"
 
 #include "Constants.h"
@@ -184,36 +186,37 @@ void onMenuClose() {
 }
 
 void update_mainmenu() {
-    g_menu.Title("Manual Transmission");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("menu.title"));
     g_menu.Subtitle(fmt::format("~b~{}{}", Constants::DisplayVersion, GIT_DIFF));
 
     if (Paths::GetModPathChanged()) {
-        g_menu.Option("Warning: Mod path moved!", NativeMenu::solidRed,
-            { "Script failed writing log file in the original location.",
-              "Entire ManualTransmission folder moved to AppData folder.",
-              fmt::format("Old path: {}", Paths::GetInitialModPath()),
-              fmt::format("New path: {}", Paths::GetModPath()) });
+        g_menu.Option(lang.Tr("main.modpathwarning"), NativeMenu::solidRed,
+            { lang.Tr("main.modpathwarning.desc1"),
+              lang.Tr("main.modpathwarning.desc2"),
+              fmt::format("{} {}", lang.Tr("main.modpathwarning.oldpath"), Paths::GetInitialModPath()),
+              fmt::format("{} {}", lang.Tr("main.modpathwarning.newpath"), Paths::GetModPath()) });
     }
 
     if (g_settings.Error()) {
-        g_menu.Option("Settings load/save error", NativeMenu::solidRed,
-            { "Script failed to read or write the settings file(s).",
-              "This may be caused by the ManualTransmission folder and the files within being marked as read-only.",
-              "Deselect read-only on the folder properties to try and fix it." });
+        g_menu.Option(lang.Tr("main.settingserror"), NativeMenu::solidRed,
+            { lang.Tr("main.settingserror.desc1"),
+              lang.Tr("main.settingserror.desc2"),
+              lang.Tr("main.settingserror.desc3") });
     }
 
     if (logger.Error()) {
-        g_menu.Option("Logging error", NativeMenu::solidRed,
-            { "Script failed to write to the log file.",
-              "This may be caused by the ManualTransmission folder and the files within being marked as read-only.",
-              "Deselect read-only on the folder properties to try and fix it." });
+        g_menu.Option(lang.Tr("main.loggingerror"), NativeMenu::solidRed,
+            { lang.Tr("main.loggingerror.desc1"),
+              lang.Tr("main.loggingerror.desc2"),
+              lang.Tr("main.loggingerror.desc3") });
     }
 
     if (MemoryPatcher::Error) {
-        g_menu.Option("Patch test error", NativeMenu::solidRed, 
-            { "One or more components failed to patch. Mod behavior is uncertain.",
-              "Usually caused by a game update, or an incompatible version.", 
-              "Check Gears.log for more details." });
+        g_menu.Option(lang.Tr("main.patcherror"), NativeMenu::solidRed, 
+            { lang.Tr("main.patcherror.desc1"),
+              lang.Tr("main.patcherror.desc2"), 
+              lang.Tr("main.patcherror.desc3") });
     }
 
     {
@@ -225,22 +228,22 @@ void update_mainmenu() {
                     NativeMenu::split(g_releaseInfo.Body, '\n');
 
                 std::vector<std::string> extra = {
-                    fmt::format("New version: {}", g_releaseInfo.Version.c_str()),
-                    fmt::format("Release date: {}", g_releaseInfo.TimestampPublished.c_str()),
-                    "Changelog:"
+                    fmt::format(lang.Tr("main.update.newversion"), g_releaseInfo.Version.c_str()),
+                    fmt::format(lang.Tr("main.update.releasedate"), g_releaseInfo.TimestampPublished.c_str()),
+                    lang.Tr("main.update.changelog")
                 };
 
                 for (const auto& line : bodyLines) {
                     extra.push_back(line);
                 }
 
-                if (g_menu.OptionPlus("New update available!", extra, nullptr, [] {
+                if (g_menu.OptionPlus(lang.Tr("main.update.available"), extra, nullptr, [] {
                     g_settings.Update.IgnoredVersion = g_releaseInfo.Version;
                     g_notifyUpdate = false;
                     saveAllSettings();
-                    }, nullptr, "Update info",
-                    { "Press Select/Enter to check GTA5-Mods.com.",
-                        "Press right to ignore the current update." })) {
+                    }, nullptr, lang.Tr("main.update.info"),
+                    { lang.Tr("main.update.desc1"),
+                        lang.Tr("main.update.desc2") })) {
                     WAIT(20);
                     PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, ControlFrontendPause, 1.0f);
                     ShellExecuteA(0, 0, modUrl.c_str(), 0, 0, SW_SHOW);
@@ -250,55 +253,42 @@ void update_mainmenu() {
     }
 
     bool tempEnableRead = g_settings.MTOptions.Enable;
-    if (g_menu.BoolOption("Enable Manual Transmission", tempEnableRead,
-        { "Enable or disable the manual transmission. Steering wheel stays active." })) {
+    if (g_menu.BoolOption(lang.Tr("main.enablemt"), tempEnableRead,
+        { lang.Tr("main.enablemt.desc") })) {
         toggleManual(!g_settings.MTOptions.Enable);
     }
 
     int tempShiftMode = static_cast<int>(g_settings().MTOptions.ShiftMode);
 
     std::vector<std::string> detailsTemp {
-        "Choose your gearbox! Options are Sequential, H-pattern and Automatic."
+        lang.Tr("main.gearbox.desc")
     };
 
     if (g_settings.ConfigActive()) {
         detailsTemp.push_back(fmt::format("CFG: [{}]", g_settings().Name));
     }
 
-    g_menu.StringArray("Gearbox", gearboxModes, tempShiftMode,
+    g_menu.StringArray(lang.Tr("main.gearbox"), gearboxModes, tempShiftMode,
         detailsTemp);
 
     if (tempShiftMode != static_cast<int>(g_settings().MTOptions.ShiftMode)) {
         setShiftMode(static_cast<EShiftMode>(tempShiftMode));
     }
 
-    g_menu.MenuOption("Manual Transmission settings", "settingsmenu", 
-        { "Choose what parts of the Manual Transmission script are active." });
-
-    g_menu.MenuOption("Controls", "controlsmenu", 
-        { "Configure controls for the script." });
-
-    g_menu.MenuOption("Driving assists", "driveassistmenu",
-        { "ABS, TCS and ESC assist options for the player." });
-
-    g_menu.MenuOption("Gameplay assists", "gameassistmenu",
-        { "Assist to make playing a bit easier." });
-
-    g_menu.MenuOption("Misc options", "miscoptionsmenu",
-        { "Various features that don't fit in the other categories." });
-
-    g_menu.MenuOption("HUD options", "hudmenu",
-        { "Change and move HUD elements." });
-
-    g_menu.MenuOption("Developer options", "devoptionsmenu", 
-        { "Various settings for debugging, compatibility, etc." });
+    g_menu.MenuOption(lang.Tr("menu.settings"), "settingsmenu", { lang.Tr("menu.settings.desc") });
+    g_menu.MenuOption(lang.Tr("menu.controls"), "controlsmenu", { lang.Tr("menu.controls.desc") });
+    g_menu.MenuOption(lang.Tr("menu.driveassist"), "driveassistmenu", { lang.Tr("menu.driveassist.desc") });
+    g_menu.MenuOption(lang.Tr("menu.gameassist"), "gameassistmenu", { lang.Tr("menu.gameassist.desc") });
+    g_menu.MenuOption(lang.Tr("menu.misc"), "miscoptionsmenu", { lang.Tr("menu.misc.desc") });
+    g_menu.MenuOption(lang.Tr("menu.hud"), "hudmenu", { lang.Tr("menu.hud.desc") });
+    g_menu.MenuOption(lang.Tr("menu.dev"), "devoptionsmenu", { lang.Tr("menu.dev.desc") });
 
     if (g_settings.Debug.DisableInputDetect) {
         int activeIndex = g_controls.PrevInput;
         std::vector<std::string> inputNames {
-            "Keyboard", "Controller", "Wheel"
+            lang.Tr("main.input.keyboard"), lang.Tr("main.input.controller"), lang.Tr("main.input.wheel")
         };
-        if (g_menu.StringArray("Active input", inputNames, activeIndex, { "Active input is set manually." })) {
+        if (g_menu.StringArray(lang.Tr("main.activeinput"), inputNames, activeIndex, { lang.Tr("main.activeinput.desc_manual") })) {
             g_controls.PrevInput = static_cast<CarControls::InputDevices>(activeIndex);
         }
     }
@@ -307,284 +297,255 @@ void update_mainmenu() {
         std::string activeInputName;
         switch (g_controls.PrevInput) {
         case CarControls::Keyboard:
-            activeInputName = "Keyboard";
+            activeInputName = lang.Tr("main.input.keyboard");
             break;
         case CarControls::Controller:
-            activeInputName = "Controller";
+            activeInputName = lang.Tr("main.input.controller");
             break;
         case CarControls::Wheel:
-            activeInputName = "Wheel";
+            activeInputName = lang.Tr("main.input.wheel");
             break;
         }
-        g_menu.StringArray("Active input", { activeInputName }, activeIndex, 
-            { "Active input is automatically detected when throttle, brake or clutch is pressed on a configured device." });
+        g_menu.StringArray(lang.Tr("main.activeinput"), { activeInputName }, activeIndex, 
+            { lang.Tr("main.activeinput.desc_auto") });
     }
 }
 
 void update_settingsmenu() {
-    g_menu.Title("Manual Transmission");
-    g_menu.Subtitle("Settings");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("menu.title"));
+    g_menu.Subtitle(lang.Tr("settings.subtitle"));
 
-    g_menu.MenuOption("Features", "featuresmenu",
-        { "Turn on or off parts of Manual Transmission." });
-
-    g_menu.MenuOption("Finetuning", "finetuneoptionsmenu",
-        { "Fine-tune the parameters above." });
-
-    g_menu.MenuOption("Shifting options", "shiftingoptionsmenu",
-        { "Change the shifting behavior for sequential and automatic modes." } );
-
-    g_menu.MenuOption("Automatic finetuning", "finetuneautooptionsmenu",
-        { "Fine-tune script-provided automatic transmission parameters." });
-
-    g_menu.MenuOption("Vehicle configurations", "vehconfigmenu",
-        { "Vehicle configurations override the base mod settings, for specific vehicles. This allows selectively "
-          "enabling assists or per-vehicle tweaked finetuning options.",
-          "\"CFG: [...]\" in a menu subtitle or setting "
-          "description indicates that the settings you change are vehicle-specific."});
+    g_menu.MenuOption(lang.Tr("settings.features"), "featuresmenu", { lang.Tr("settings.features.desc") });
+    g_menu.MenuOption(lang.Tr("settings.finetune"), "finetuneoptionsmenu", { lang.Tr("settings.finetune.desc") });
+    g_menu.MenuOption(lang.Tr("settings.shifting"), "shiftingoptionsmenu", { lang.Tr("settings.shifting.desc") });
+    g_menu.MenuOption(lang.Tr("settings.auto_finetune"), "finetuneautooptionsmenu", { lang.Tr("settings.auto_finetune.desc") });
+    g_menu.MenuOption(lang.Tr("settings.vehconfig"), "vehconfigmenu", { lang.Tr("settings.vehconfig.desc1"), lang.Tr("settings.vehconfig.desc2"), lang.Tr("settings.vehconfig.desc3") });
 }
 
 void update_featuresmenu() {
-    g_menu.Title("Features");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("features.title"));
 
     if (g_settings.ConfigActive())
-        g_menu.Subtitle(fmt::format("CFG: [{} (Partial)]", g_settings().Name));
+        g_menu.Subtitle(fmt::format(lang.Tr("features.subtitle.partial"), g_settings().Name));
     else
         g_menu.Subtitle(MenuSubtitleConfig());
 
-    g_menu.BoolOption("Engine Damage", g_settings.MTOptions.EngDamage,
-        { "Damage the engine when over-revving and when mis-shifting." });
-
-    g_menu.BoolOption("Engine stalling (H)", g_settings.MTOptions.EngStallH,
-        { "Stall the engine when the wheel speed gets too low. Applies to H-pattern shift mode." });
-
-    g_menu.BoolOption("Engine stalling (S)", g_settings.MTOptions.EngStallS,
-        { "Stall the engine when the wheel speed gets too low. Applies to sequential shift mode." });
-
-    g_menu.BoolOption("Engine braking", g_settings.MTOptions.EngBrake,
-        { "Help the car braking by slowing down more at high RPMs." });
-
-    g_menu.BoolOption("Gear/RPM lockup", g_settings.MTOptions.EngLock,
-        { "Simulate wheel lock-up when mis-shifting to a too low gear for the RPM range." });
-
-    g_menu.BoolOption("Final gear RPM limit", g_settings.MTOptions.FinalGearRPMLimit,
-        { "Limit accelerating beyond engine redline in top gear, or reverse." });
-
-    g_menu.BoolOption("Enable speed limiter", g_settings().MTOptions.SpeedLimiter.Enable,
-        { "Electronically limit speed." });
-
-    g_menu.MenuOption("Speed limiter settings", "speedlimitersettingsmenu");
-
-    g_menu.BoolOption("Clutch shift (H)", g_settings().MTOptions.ClutchShiftH,
-        { "Require holding the clutch to shift in H-pattern shift mode. (Vehicle specific)" });
-
-    g_menu.BoolOption("Clutch shift (S)", g_settings().MTOptions.ClutchShiftS,
-        { "Require holding the clutch to shift in sequential mode. (Vehicle specific)" });
-
-    g_menu.BoolOption("Clutch creep", g_settings().MTOptions.ClutchCreep,
-        { "Simulate clutch creep when stopped with clutch engaged. (Vehicle specific)" });
+    g_menu.BoolOption(lang.Tr("features.engdamage"), g_settings.MTOptions.EngDamage, { lang.Tr("features.engdamage.desc") });
+    g_menu.BoolOption(lang.Tr("features.engstallh"), g_settings.MTOptions.EngStallH, { lang.Tr("features.engstallh.desc") });
+    g_menu.BoolOption(lang.Tr("features.engstalls"), g_settings.MTOptions.EngStallS, { lang.Tr("features.engstalls.desc") });
+    g_menu.BoolOption(lang.Tr("features.engbrake"), g_settings.MTOptions.EngBrake, { lang.Tr("features.engbrake.desc") });
+    g_menu.BoolOption(lang.Tr("features.englock"), g_settings.MTOptions.EngLock, { lang.Tr("features.englock.desc") });
+    g_menu.BoolOption(lang.Tr("features.finalgearrpm"), g_settings.MTOptions.FinalGearRPMLimit, { lang.Tr("features.finalgearrpm.desc") });
+    g_menu.BoolOption(lang.Tr("features.speedlimiter"), g_settings().MTOptions.SpeedLimiter.Enable, { lang.Tr("features.speedlimiter.desc") });
+    g_menu.MenuOption(lang.Tr("features.speedlimiter.settings"), "speedlimitersettingsmenu");
+    g_menu.BoolOption(lang.Tr("features.clutchshifth"), g_settings().MTOptions.ClutchShiftH, { lang.Tr("features.clutchshifth.desc") });
+    g_menu.BoolOption(lang.Tr("features.clutchshifts"), g_settings().MTOptions.ClutchShiftS, { lang.Tr("features.clutchshifts.desc") });
+    g_menu.BoolOption(lang.Tr("features.clutchcreep"), g_settings().MTOptions.ClutchCreep, { lang.Tr("features.clutchcreep.desc") });
 }
 
 void update_finetuneoptionsmenu() {
-    g_menu.Title("Finetuning");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("finetune.title"));
     g_menu.Subtitle(MenuSubtitleConfig());
 
-    g_menu.FloatOption("Clutch bite threshold", g_settings().MTParams.ClutchThreshold, 0.0f, 1.0f, 0.05f,
-        { "How far the clutch has to be lifted to start biting." });
-    g_menu.FloatOption("Stalling RPM", g_settings().MTParams.StallingRPM, 0.0f, 0.2f, 0.01f,
-        { "Consider stalling when the expected RPM drops below this value.",
-          "The range is 0.0 to 0.2. The engine idles at 0.2 in GTA.",
-          "Expected RPM is based on car speed and current gear ratio."});
-    g_menu.FloatOption("Stalling rate", g_settings().MTParams.StallingRate, 0.0f, 10.0f, 0.05f,
-        { "How quick the engine should stall. Higher values make it stall faster." });
-    g_menu.FloatOption("Stalling slip", g_settings().MTParams.StallingSlip, 0.0f, 1.0f, 0.05f,
-        { "How much the clutch may slip before the stalling rate picks up." });
+    g_menu.FloatOption(lang.Tr("finetune.clutchbite"), g_settings().MTParams.ClutchThreshold, 0.0f, 1.0f, 0.05f,
+        { lang.Tr("finetune.clutchbite.desc") });
+    g_menu.FloatOption(lang.Tr("finetune.stallrpm"), g_settings().MTParams.StallingRPM, 0.0f, 0.2f, 0.01f,
+        { lang.Tr("finetune.stallrpm.desc1"),
+          lang.Tr("finetune.stallrpm.desc2"),
+          lang.Tr("finetune.stallrpm.desc3")});
+    g_menu.FloatOption(lang.Tr("finetune.stallrate"), g_settings().MTParams.StallingRate, 0.0f, 10.0f, 0.05f,
+        { lang.Tr("finetune.stallrate.desc") });
+    g_menu.FloatOption(lang.Tr("finetune.stallslip"), g_settings().MTParams.StallingSlip, 0.0f, 1.0f, 0.05f,
+        { lang.Tr("finetune.stallslip.desc") });
 
-    g_menu.FloatOption("RPM damage", g_settings().MTParams.RPMDamage, 0.0f, 10.0f, 0.05f,
-        { "Damage from redlining too long." });
-    g_menu.FloatOption("Misshift damage", g_settings().MTParams.MisshiftDamage, 0, 100, 5,
-        { "Damage from being over the rev range." });
-    g_menu.FloatOption("Engine braking threshold", g_settings().MTParams.EngBrakeThreshold, 0.0f, 1.0f, 0.05f,
-        { "RPM where engine braking starts being effective." });
-    g_menu.FloatOption("Engine braking power", g_settings().MTParams.EngBrakePower, 0.0f, 5.0f, 0.05f,
-        { "Decrease this value if your wheels lock up when engine braking." });
+    g_menu.FloatOption(lang.Tr("finetune.rpmdamage"), g_settings().MTParams.RPMDamage, 0.0f, 10.0f, 0.05f,
+        { lang.Tr("finetune.rpmdamage.desc") });
+    g_menu.FloatOption(lang.Tr("finetune.misshiftdamage"), g_settings().MTParams.MisshiftDamage, 0, 100, 5,
+        { lang.Tr("finetune.misshiftdamage.desc") });
+    g_menu.FloatOption(lang.Tr("finetune.engbrakethresh"), g_settings().MTParams.EngBrakeThreshold, 0.0f, 1.0f, 0.05f,
+        { lang.Tr("finetune.engbrakethresh.desc") });
+    g_menu.FloatOption(lang.Tr("finetune.engbrakepower"), g_settings().MTParams.EngBrakePower, 0.0f, 5.0f, 0.05f,
+        { lang.Tr("finetune.engbrakepower.desc") });
 
     // Clutch creep params
-    g_menu.FloatOption("Clutch creep idle RPM", g_settings().MTParams.CreepIdleRPM, 0.0f, 0.5f, 0.01f,
-        { "RPM at which the engine should be idling and the car wants to move by itself.",
-          "Engines in GTA idle at 0.2, but this is rather high."});
-    g_menu.FloatOption("Clutch creep throttle", g_settings().MTParams.CreepIdleThrottle, 0.0f, 1.0f, 0.01f,
-        { "How much throttle is given when the car speed drops below the idle RPM." });
+    g_menu.FloatOption(lang.Tr("finetune.creepidlerpm"), g_settings().MTParams.CreepIdleRPM, 0.0f, 0.5f, 0.01f,
+        { lang.Tr("finetune.creepidlerpm.desc1"),
+          lang.Tr("finetune.creepidlerpm.desc2")});
+    g_menu.FloatOption(lang.Tr("finetune.creepthrottle"), g_settings().MTParams.CreepIdleThrottle, 0.0f, 1.0f, 0.01f,
+        { lang.Tr("finetune.creepthrottle.desc") });
 }
 
 void update_shiftingoptionsmenu() {
-    g_menu.Title("Shifting options");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("shifting.title"));
     g_menu.Subtitle(MenuSubtitleConfig());
 
-    g_menu.BoolOption("Cut throttle on upshift", g_settings().ShiftOptions.UpshiftCut,
-        { "Helps rev matching.",
-            "Only applies to sequential mode."});
-    g_menu.BoolOption("Blip throttle on downshift", g_settings().ShiftOptions.DownshiftBlip,
-        { "Helps rev matching.",
-            "Only applies to sequential mode." });
-    g_menu.BoolOption("Downshift protection", g_settings().ShiftOptions.DownshiftProtect,
-        { "Prevents downshifting causing overrevving. Only applies to sequential mode.",
-            "Customize protection warning in the HUD options." });
-    g_menu.FloatOption("Clutch rate multiplier", g_settings().ShiftOptions.ClutchRateMult, 0.05f, 20.0f, 0.05f,
-        { "Change how fast clutching is. Below 1 is slower, higher than 1 is faster.",
-            "Applies to sequential and automatic mode." });
+    g_menu.BoolOption(lang.Tr("shifting.upshiftcut"), g_settings().ShiftOptions.UpshiftCut,
+        { lang.Tr("shifting.upshiftcut.desc1"),
+            lang.Tr("shifting.upshiftcut.desc2")});
+    g_menu.BoolOption(lang.Tr("shifting.downshiftblip"), g_settings().ShiftOptions.DownshiftBlip,
+        { lang.Tr("shifting.downshiftblip.desc1"),
+            lang.Tr("shifting.downshiftblip.desc2") });
+    g_menu.BoolOption(lang.Tr("shifting.downshiftprot"), g_settings().ShiftOptions.DownshiftProtect,
+        { lang.Tr("shifting.downshiftprot.desc1"),
+            lang.Tr("shifting.downshiftprot.desc2") });
+    g_menu.FloatOption(lang.Tr("shifting.clutchratemult"), g_settings().ShiftOptions.ClutchRateMult, 0.05f, 20.0f, 0.05f,
+        { lang.Tr("shifting.clutchratemult.desc1"),
+            lang.Tr("shifting.clutchratemult.desc2") });
 
-    g_menu.FloatOption("Shifting RPM tolerance", g_settings().ShiftOptions.RPMTolerance, 0.0f, 1.0f, 0.05f,
-        { "RPM mismatch tolerance on shifts",
-            "Only applies to H-pattern with \"Clutch Shift\" enabled.",
-            fmt::format("Clutch Shift (H) is {}abled.", g_settings().MTOptions.ClutchShiftH ? "~g~en" : "~r~dis")
+    g_menu.FloatOption(lang.Tr("shifting.rpmtolerance"), g_settings().ShiftOptions.RPMTolerance, 0.0f, 1.0f, 0.05f,
+        { lang.Tr("shifting.rpmtolerance.desc1"),
+            lang.Tr("shifting.rpmtolerance.desc2"),
+            fmt::format(lang.Tr("shifting.rpmtolerance.desc3"), g_settings().MTOptions.ClutchShiftH ? "~g~en" : "~r~dis")
         });
 }
 
 void update_finetuneautooptionsmenu() {
-    g_menu.Title("Automatic finetuning");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("auto_finetune.title"));
     g_menu.Subtitle(MenuSubtitleConfig());
 
-    g_menu.FloatOption("Upshift engine load", g_settings().AutoParams.UpshiftLoad, 0.01f, 0.20f, 0.01f,
-        { "Upshift when the engine load drops below this value. "
-          "Raise this value if the car can't upshift."});
-    g_menu.FloatOption("Upshift timeout multiplier", g_settings().AutoParams.UpshiftTimeoutMult, 0.00f, 10.00f, 0.05f,
-        { "Don't upshift too quickly. "
-          "Timeout based on clutch change rate.",
-          "Raise for longer timeout, lower to allow upshifts following up eachother quicker. 0 to disable." });
-    g_menu.FloatOption("Downshift engine load", g_settings().AutoParams.DownshiftLoad, 0.30f, 1.00f, 0.01f,
-        { "Downshift when the engine load rises over this value. "
-          "Raise this value if the car downshifts right after upshifting." });
-    g_menu.FloatOption("Downshift timeout multiplier", g_settings().AutoParams.DownshiftTimeoutMult, 0.05f, 10.00f, 0.05f,
-        { "Don't downshift while car has just shifted up. "
-          "Timeout based on clutch change rate.",
-          "Raise for longer timeout, lower to allow earlier downshifting after an upshift." });
-    g_menu.FloatOption("Next gear min RPM",    g_settings().AutoParams.NextGearMinRPM, 0.20f, 0.50f, 0.01f, 
-        { "Don't upshift until next gears' RPM is over this value." });
-    g_menu.FloatOption("Current gear min RPM", g_settings().AutoParams.CurrGearMinRPM, 0.20f, 0.50f, 0.01f, 
-        { "Downshift when RPM drops below this value." });
-    g_menu.FloatOption("Economy rate", g_settings().AutoParams.EcoRate, 0.01f, 0.50f, 0.01f,
-        { "On releasing throttle, high values cause earlier upshifts.",
-          "Set this low to stay in gear longer when releasing throttle." });
-    g_menu.BoolOption("Use ATCU (experimental)", g_settings().AutoParams.UsingATCU,
-        { "Using experimental new Automatic Transmission Control Unit by Nyconing.",
-          "ATCU is configurationless, the above settings are ignored." });
+    g_menu.FloatOption(lang.Tr("auto_finetune.upshiftload"), g_settings().AutoParams.UpshiftLoad, 0.01f, 0.20f, 0.01f,
+        { lang.Tr("auto_finetune.upshiftload.desc")});
+    g_menu.FloatOption(lang.Tr("auto_finetune.upshifttimeout"), g_settings().AutoParams.UpshiftTimeoutMult, 0.00f, 10.00f, 0.05f,
+        { lang.Tr("auto_finetune.upshifttimeout.desc1"),
+          lang.Tr("auto_finetune.upshifttimeout.desc2") });
+    g_menu.FloatOption(lang.Tr("auto_finetune.downshiftload"), g_settings().AutoParams.DownshiftLoad, 0.30f, 1.00f, 0.01f,
+        { lang.Tr("auto_finetune.downshiftload.desc") });
+    g_menu.FloatOption(lang.Tr("auto_finetune.downshifttimeout"), g_settings().AutoParams.DownshiftTimeoutMult, 0.05f, 10.00f, 0.05f,
+        { lang.Tr("auto_finetune.downshifttimeout.desc1"),
+          lang.Tr("auto_finetune.downshifttimeout.desc2") });
+    g_menu.FloatOption(lang.Tr("auto_finetune.nextgearminrpm"), g_settings().AutoParams.NextGearMinRPM, 0.20f, 0.50f, 0.01f, 
+        { lang.Tr("auto_finetune.nextgearminrpm.desc") });
+    g_menu.FloatOption(lang.Tr("auto_finetune.currgearminrpm"), g_settings().AutoParams.CurrGearMinRPM, 0.20f, 0.50f, 0.01f, 
+        { lang.Tr("auto_finetune.currgearminrpm.desc") });
+    g_menu.FloatOption(lang.Tr("auto_finetune.economyrate"), g_settings().AutoParams.EcoRate, 0.01f, 0.50f, 0.01f,
+        { lang.Tr("auto_finetune.economyrate.desc1"),
+          lang.Tr("auto_finetune.economyrate.desc2") });
+    g_menu.BoolOption(lang.Tr("auto_finetune.useatcu"), g_settings().AutoParams.UsingATCU,
+        { lang.Tr("auto_finetune.useatcu.desc1"),
+          lang.Tr("auto_finetune.useatcu.desc2") });
 }
 
 void update_vehconfigmenu() {
-    g_menu.Title("Custom vehicle settings");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("vehconfig.title"));
     g_menu.Subtitle(MenuSubtitleConfig());
 
-    if (g_menu.Option("Create configuration...", 
-        { "Create a new, empty current configuration file.",
-          "Changes made within a configuration are saved to that configuration only.",
-          "The submenu subtitles indicate which configuration is being edited." })) {
+    if (g_menu.Option(lang.Tr("vehconfig.create"), 
+        { lang.Tr("vehconfig.create.desc1"),
+          lang.Tr("vehconfig.create.desc2"),
+          lang.Tr("vehconfig.create.desc3") })) {
         SaveVehicleConfig();
     }
 
-    if (g_menu.Option("Reload configurations", 
-        { "Reload to update manual changes in the Vehicles folder." })) {
+    if (g_menu.Option(lang.Tr("vehconfig.reload"), 
+        { lang.Tr("vehconfig.reload.desc") })) {
         loadConfigs();
     }
 
     if (g_settings.ConfigActive()) {
         bool sel = false;
-        g_menu.OptionPlus(fmt::format("Active configuration: [{}]", g_settings().Name), {}, &sel, nullptr, nullptr, "",
-            { "Currently using this configuration. Any changes made are saved into the current configuration.",
-              "When multiple configurations work with the same model, the configuration that comes first "
-              "alphabetically is used." });
+        g_menu.OptionPlus(fmt::format(lang.Tr("vehconfig.active"), g_settings().Name), {}, &sel, nullptr, nullptr, "",
+            { lang.Tr("vehconfig.active.desc1"),
+              lang.Tr("vehconfig.active.desc2") });
         if (sel) {
             auto extras = FormatVehicleConfig(g_settings(), gearboxModes);
-            g_menu.OptionPlusPlus(extras, "Configuration overview");
+            g_menu.OptionPlusPlus(extras, lang.Tr("vehconfig.overview"));
         }
     }
     else {
-        g_menu.Option("No active configuration");
+        g_menu.Option(lang.Tr("vehconfig.noactive"));
     }
 
-    g_menu.BoolOption("Save entire configuration", g_settings.Misc.SaveFullConfig,
-        { "Enabled: Writes the full configuration for all configurations.",
-            "Disabled: Only write difference between specific and base configuration." });
+    g_menu.BoolOption(lang.Tr("vehconfig.savefull"), g_settings.Misc.SaveFullConfig,
+        { lang.Tr("vehconfig.savefull.desc1"),
+            lang.Tr("vehconfig.savefull.desc2") });
 
     for (const auto& vehConfig : g_vehConfigs) {
         bool sel = false;
         std::vector<std::string> descr = {
-            "This config will activate if you get into a compatible vehicle.",
-            "First matches by model & plate, then just checks model."
+            lang.Tr("vehconfig.config.desc1"),
+            lang.Tr("vehconfig.config.desc2")
         };
         g_menu.OptionPlus(vehConfig.Name, {}, &sel, nullptr, nullptr, "", descr);
         if (sel) {
             auto extras = FormatVehicleConfig(vehConfig, gearboxModes);
-            g_menu.OptionPlusPlus(extras, "Configuration overview");
+            g_menu.OptionPlusPlus(extras, lang.Tr("vehconfig.overview"));
         }
     }
 
     if (g_vehConfigs.empty()) {
-        g_menu.OptionPlus("No configurations found", {}, nullptr, nullptr, nullptr, "Instructions", {
-            "Overrides allow you to specify custom rules for specific vehicles, that override the global settings.",
-            "For example, you can set different default shift modes, set which assists are active, or use different force feedback profiles for each car.",
-            R"(Check the "Vehicles" folder inside the "ManualTransmission folder for more information!")"
+        g_menu.OptionPlus(lang.Tr("vehconfig.notfound"), {}, nullptr, nullptr, nullptr, lang.Tr("vehconfig.instructions"), {
+            lang.Tr("vehconfig.notfound.desc1"),
+            lang.Tr("vehconfig.notfound.desc2"),
+            lang.Tr("vehconfig.notfound.desc3")
             });
     }
 }
 
 
 void update_controlsmenu() {
-    g_menu.Title("Controls");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("controls.title"));
     g_menu.Subtitle("");
 
-    g_menu.MenuOption("Controller", "controllermenu",
-        { "Modify bindings and adjustments for controller input." });
+    g_menu.MenuOption(lang.Tr("controls.controller"), "controllermenu",
+        { lang.Tr("controls.controller.desc") });
 
-    g_menu.MenuOption("Keyboard", "keyboardmenu",
-        { "Modify bindings for keyboard input." });
+    g_menu.MenuOption(lang.Tr("controls.keyboard"), "keyboardmenu",
+        { lang.Tr("controls.keyboard.desc") });
 
-    g_menu.MenuOption("Wheel & pedals", "wheelmenu",
-        { "Create and modify bindings and adjustments for steering wheels and pedals." });
+    g_menu.MenuOption(lang.Tr("controls.wheel"), "wheelmenu",
+        { lang.Tr("controls.wheel.desc") });
 
-    g_menu.MenuOption("Steering assists", "steeringassistmenu",
-        { "Customize steering input for keyboards and controllers." });
+    g_menu.MenuOption(lang.Tr("controls.steerassist"), "steeringassistmenu",
+        { lang.Tr("controls.steerassist.desc") });
 
-    g_menu.MenuOption("Vehicle specific", "controlsvehconfmenu",
-        { "Override and adjust input behavior for specific vehicle configurations." });
+    g_menu.MenuOption(lang.Tr("controls.vehspecific"), "controlsvehconfmenu",
+        { lang.Tr("controls.vehspecific.desc") });
 }
 
 void update_controlsvehconfmenu() {
-    g_menu.Title("Vehicle specific");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("controlsveh.title"));
     g_menu.Subtitle(MenuSubtitleConfig());
 
-    g_menu.BoolOption("ES: Override wheel rotation", g_settings().Steering.CustomSteering.UseCustomLock,
-        { "Enhanced Steering",
-          "Override the default 180 degree steering wheel rotation." });
+    g_menu.BoolOption(lang.Tr("controlsveh.esoverride"), g_settings().Steering.CustomSteering.UseCustomLock,
+        { lang.Tr("controlsveh.es"),
+          lang.Tr("controlsveh.esoverride.desc") });
 
-    g_menu.FloatOptionCb("ES: Wheel rotation", g_settings().Steering.CustomSteering.SoftLock, 180.0f, 2880.0f, 30.0f, GetKbEntryFloat,
-        { "Enhanced Steering",
-          "Degrees of rotation for the vehicle steering wheel. Does not change max steering angle." });
+    g_menu.FloatOptionCb(lang.Tr("controlsveh.esrotation"), g_settings().Steering.CustomSteering.SoftLock, 180.0f, 2880.0f, 30.0f, GetKbEntryFloat,
+        { lang.Tr("controlsveh.es"),
+          lang.Tr("controlsveh.esrotation.desc") });
 
-    g_menu.FloatOptionCb("ES: Steering multiplier", g_settings().Steering.CustomSteering.SteeringMult, 0.01f, 2.0f, 0.01f, GetKbEntryFloat,
-        { "Enhanced Steering",
-          "Increase or decrease actual max steering angle." });
+    g_menu.FloatOptionCb(lang.Tr("controlsveh.esmult"), g_settings().Steering.CustomSteering.SteeringMult, 0.01f, 2.0f, 0.01f, GetKbEntryFloat,
+        { lang.Tr("controlsveh.es"),
+          lang.Tr("controlsveh.esmult.desc") });
 
-    g_menu.FloatOptionCb("ES: Steering reduction", g_settings().Steering.CustomSteering.SteeringReduction, 0.0f, 2.0f, 0.01f, GetKbEntryFloat,
-        { "Enhanced Steering",
-          "From InfamousSabre's Custom Steering.",
-          "Reduce steering input at higher speeds.",
-          "Increase for vehicles with low optimum slip angle.",
-          "Decrease for vehicles with high optimum slip angle."});
+    g_menu.FloatOptionCb(lang.Tr("controlsveh.esreduction"), g_settings().Steering.CustomSteering.SteeringReduction, 0.0f, 2.0f, 0.01f, GetKbEntryFloat,
+        { lang.Tr("controlsveh.es"),
+          lang.Tr("controlsveh.esreduction.desc1"),
+          lang.Tr("controlsveh.esreduction.desc2"),
+          lang.Tr("controlsveh.esreduction.desc3"),
+          lang.Tr("controlsveh.esreduction.desc4")});
 
-    g_menu.FloatOptionCb("Wheel: FFB SAT mult", g_settings().Steering.Wheel.SATMult, 0.05f, 10.0f, 0.05f, GetKbEntryFloat,
-        { "Wheel",
-          "Vehicle-specific FFB SAT adjustment. Same comments apply as in the FFB section.",
-          "Increase to make steering heavier, decrease to make it lighter." });
+    g_menu.FloatOptionCb(lang.Tr("controlsveh.ffbsatmult"), g_settings().Steering.Wheel.SATMult, 0.05f, 10.0f, 0.05f, GetKbEntryFloat,
+        { lang.Tr("controlsveh.wheel"),
+          lang.Tr("controlsveh.ffbsatmult.desc1"),
+          lang.Tr("controlsveh.ffbsatmult.desc2") });
 
     bool showDynamicFfbCurveBox = false;
-    if (g_menu.OptionPlus(fmt::format("Wheel: FFB response curve mult: < {:.2f} >", g_settings().Steering.Wheel.CurveMult), {}, &showDynamicFfbCurveBox,
+    if (g_menu.OptionPlus(fmt::format(lang.Tr("controlsveh.ffbcurve"), g_settings().Steering.Wheel.CurveMult), {}, &showDynamicFfbCurveBox,
         [=] { return incVal(g_settings().Steering.Wheel.CurveMult, 5.00f, 0.01f); },
         [=] { return decVal(g_settings().Steering.Wheel.CurveMult, 0.01f, 0.01f); },
-        "Response curve", {
-            "Wheel",
-            "Vehicle-specific FFB curve adjustment. Same comments apply as in the FFB section.",
-            "Increase to make response more linear, decrease to make it quicker." })) {
+        lang.Tr("controlsveh.responsecurve"), {
+            lang.Tr("controlsveh.wheel"),
+            lang.Tr("controlsveh.ffbcurve.desc1"),
+            lang.Tr("controlsveh.ffbcurve.desc2") })) {
         float val = g_settings.Wheel.FFB.ResponseCurve;
         if (GetKbEntryFloat(val)) {
             g_settings.Wheel.FFB.ResponseCurve = val;
@@ -595,71 +556,72 @@ void update_controlsvehconfmenu() {
         auto extras = ShowDynamicFfbCurve(abs(WheelInput::GetFFBConstantForce()),
             g_settings.Wheel.FFB.ResponseCurve * g_settings().Steering.Wheel.CurveMult,
             g_settings.Wheel.FFB.FFBProfile);
-        g_menu.OptionPlusPlus(extras, "Response Curve");
+        g_menu.OptionPlusPlus(extras, lang.Tr("controlsveh.responsecurve"));
     }
 
-    g_menu.FloatOptionCb("Wheel: Soft lock", g_settings().Steering.Wheel.SoftLock, 180.0f, 2880.0f, 30.0f, GetKbEntryFloat,
-        { "Steering range for your real wheel, in degrees. Reduce for quicker steering." });
+    g_menu.FloatOptionCb(lang.Tr("controlsveh.softlock"), g_settings().Steering.Wheel.SoftLock, 180.0f, 2880.0f, 30.0f, GetKbEntryFloat,
+        { lang.Tr("controlsveh.softlock.desc") });
 
-    g_menu.FloatOptionCb("Wheel: Steering multiplier", g_settings().Steering.Wheel.SteeringMult, 0.1f, 2.0f, 0.01f, GetKbEntryFloat,
-        { "Increase or decrease actual steering lock. Increase for faster steering and more angle." });
+    g_menu.FloatOptionCb(lang.Tr("controlsveh.steermult"), g_settings().Steering.Wheel.SteeringMult, 0.1f, 2.0f, 0.01f, GetKbEntryFloat,
+        { lang.Tr("controlsveh.steermult.desc") });
 }
 
 void update_controllermenu() {
-    g_menu.Title("Controller");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("controller.title"));
     g_menu.Subtitle("");
 
-    g_menu.BoolOption("Native input", g_settings.Controller.Native.Enable,
-        { "Using a controller not supported by XInput? Enable this option and re-bind your controls." });
+    g_menu.BoolOption(lang.Tr("controller.nativeinput"), g_settings.Controller.Native.Enable,
+        { lang.Tr("controller.nativeinput.desc") });
 
     if (g_settings.Controller.Native.Enable) {
-        g_menu.MenuOption("Controller bindings (Native)", "controllerbindingsnativemenu",
-            { "Set up controller bindings." });
+        g_menu.MenuOption(lang.Tr("controller.bindingsnative"), "controllerbindingsnativemenu",
+            { lang.Tr("controller.bindings.desc") });
     }
     else {
-        g_menu.MenuOption("Controller bindings (XInput)", "controllerbindingsxinputmenu",
-            { "Set up controller bindings." });
+        g_menu.MenuOption(lang.Tr("controller.bindingsxinput"), "controllerbindingsxinputmenu",
+            { lang.Tr("controller.bindings.desc") });
     }
 
-    g_menu.BoolOption("Engine button toggles", g_settings.Controller.ToggleEngine,
-        { "Checked: the engine button turns the engine on AND off.",
-            "Not checked: the button only turns the engine on when it's off." });
+    g_menu.BoolOption(lang.Tr("controller.enginetoggle"), g_settings.Controller.ToggleEngine,
+        { lang.Tr("controller.enginetoggle.desc1"),
+            lang.Tr("controller.enginetoggle.desc2") });
 
-    g_menu.IntOption("Long press time (ms)", g_settings.Controller.HoldTimeMs, 100, 5000, 50,
-        { "Timeout for long press buttons to activate." });
+    g_menu.IntOption(lang.Tr("controller.longpress"), g_settings.Controller.HoldTimeMs, 100, 5000, 50,
+        { lang.Tr("controller.longpress.desc") });
 
-    g_menu.IntOption("Max tap time (ms)", g_settings.Controller.MaxTapTimeMs, 50, 1000, 10,
-        { "Buttons pressed and released within this time are regarded as a tap. Shift up, shift down are tap controls." });
+    g_menu.IntOption(lang.Tr("controller.maxtap"), g_settings.Controller.MaxTapTimeMs, 50, 1000, 10,
+        { lang.Tr("controller.maxtap.desc") });
 
-    g_menu.FloatOption("Trigger value", g_settings.Controller.TriggerValue, 0.25, 1.0, 0.05,
-        { "Threshold for an analog input to be detected as button press." });
+    g_menu.FloatOption(lang.Tr("controller.triggervalue"), g_settings.Controller.TriggerValue, 0.25, 1.0, 0.05,
+        { lang.Tr("controller.triggervalue.desc") });
 
-    g_menu.BoolOption("Block car controls", g_settings.Controller.BlockCarControls,
-        { "Blocks car action controls. Holding activates the original button again.",
-            "Experimental!" });
+    g_menu.BoolOption(lang.Tr("controller.blockcar"), g_settings.Controller.BlockCarControls,
+        { lang.Tr("controller.blockcar.desc1"),
+            lang.Tr("controller.blockcar.desc2") });
 
-    g_menu.BoolOption("Block H-pattern on controller", g_settings.Controller.BlockHShift,
-        { "Block H-pattern mode when using controller input." });
+    g_menu.BoolOption(lang.Tr("controller.blockhpattern"), g_settings.Controller.BlockHShift,
+        { lang.Tr("controller.blockhpattern.desc") });
 
-    g_menu.BoolOption("Ignore shifts in UI", g_settings.Controller.IgnoreShiftsUI,
-        { "Ignore shift up/shift down while using the phone or when the menu is open" });
+    g_menu.BoolOption(lang.Tr("controller.ignoreshifts"), g_settings.Controller.IgnoreShiftsUI,
+        { lang.Tr("controller.ignoreshifts.desc") });
 
     if (!g_settings.Controller.Native.Enable) {
-        g_menu.BoolOption("Custom XInput deadzones", g_settings.Controller.CustomDeadzone,
-            { "Use custom deadzones for XInput controller joysticks. Affects enhanced steering (when using XInput)." });
+        g_menu.BoolOption(lang.Tr("controller.customdeadzone"), g_settings.Controller.CustomDeadzone,
+            { lang.Tr("controller.customdeadzone.desc") });
 
         if (g_settings.Controller.CustomDeadzone) {
             float ljVal = static_cast<float>(g_settings.Controller.DeadzoneLeftThumb);
-            if (g_menu.FloatOptionCb("Deadzone left thumb", ljVal, 0.0f, 32767.0f, 1.0f, GetKbEntryFloat,
-                { "Deadzone for left thumb joystick. Works for XInput mode only!",
-                  fmt::format("Default value: {}", XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE) })) {
+            if (g_menu.FloatOptionCb(lang.Tr("controller.deadzoneleft"), ljVal, 0.0f, 32767.0f, 1.0f, GetKbEntryFloat,
+                { lang.Tr("controller.deadzoneleft.desc"),
+                  fmt::format("{} {}", lang.Tr("controller.deadzone.default"), XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE) })) {
                 g_settings.Controller.DeadzoneLeftThumb = static_cast<int>(ljVal);
             }
 
             float rjVal = static_cast<float>(g_settings.Controller.DeadzoneRightThumb);
-            if (g_menu.FloatOptionCb("Deadzone right thumb", rjVal, 0.0f, 32767.0f, 1.0f, GetKbEntryFloat,
-                { "Deadzone for right thumb joystick. Works for XInput mode only!",
-                  fmt::format("Default value: {}", XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE) })) {
+            if (g_menu.FloatOptionCb(lang.Tr("controller.deadzoneright"), rjVal, 0.0f, 32767.0f, 1.0f, GetKbEntryFloat,
+                { lang.Tr("controller.deadzoneright.desc"),
+                  fmt::format("{} {}", lang.Tr("controller.deadzone.default"), XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE) })) {
                 g_settings.Controller.DeadzoneRightThumb = static_cast<int>(rjVal);
             }
         }
@@ -667,8 +629,9 @@ void update_controllermenu() {
 }
 
 void update_controllerbindingsnativemenu() {
-    g_menu.Title("Controller bindings");
-    g_menu.Subtitle("Native mode");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("controller.bindings.title"));
+    g_menu.Subtitle(lang.Tr("controller.bindings.nativemode"));
 
     std::vector<std::string> blockableControlsHelp;
     const auto& blockableControls = BlockableControls::GetList();
@@ -678,35 +641,35 @@ void update_controllerbindingsnativemenu() {
     }
 
     int oldIndexUp = BlockableControls::GetIndex(g_controls.ControlNativeBlocks[static_cast<int>(CarControls::LegacyControlType::ShiftUp)]);
-    if (g_menu.StringArray("Shift Up blocks", blockableControlsHelp, oldIndexUp)) {
+    if (g_menu.StringArray(lang.Tr("controller.bindings.shiftupblocks"), blockableControlsHelp, oldIndexUp)) {
         g_controls.ControlNativeBlocks[static_cast<int>(CarControls::LegacyControlType::ShiftUp)] = blockableControls[oldIndexUp].Control;
     }
 
     int oldIndexDown = BlockableControls::GetIndex(g_controls.ControlNativeBlocks[static_cast<int>(CarControls::LegacyControlType::ShiftDown)]);
-    if (g_menu.StringArray("Shift Down blocks", blockableControlsHelp, oldIndexDown)) {
+    if (g_menu.StringArray(lang.Tr("controller.bindings.shiftdownblocks"), blockableControlsHelp, oldIndexDown)) {
         g_controls.ControlNativeBlocks[static_cast<int>(CarControls::LegacyControlType::ShiftDown)] = blockableControls[oldIndexDown].Control;
     }
 
     int oldIndexClutch = BlockableControls::GetIndex(g_controls.ControlNativeBlocks[static_cast<int>(CarControls::LegacyControlType::Clutch)]);
-    if (g_menu.StringArray("Clutch blocks", blockableControlsHelp, oldIndexClutch)) {
+    if (g_menu.StringArray(lang.Tr("controller.bindings.clutchblocks"), blockableControlsHelp, oldIndexClutch)) {
         g_controls.ControlNativeBlocks[static_cast<int>(CarControls::LegacyControlType::Clutch)] = blockableControls[oldIndexClutch].Control;
     }
 
     std::vector<std::string> controllerInfo = {
-        "Press RIGHT to clear key",
-        "Press RETURN to configure button",
+        lang.Tr("controller.bindings.pressrightclear"),
+        lang.Tr("controller.bindings.pressreturnconfig"),
         "",
     };
 
     for (const auto& input : g_controls.LegacyControls) {
         controllerInfo.back() = input.Description;
-        controllerInfo.push_back(fmt::format("Assigned to {} ({})", NativeController::GetControlName(input.Control), input.Control));
+        controllerInfo.push_back(fmt::format(lang.Tr("controller.bindings.assignedto"), NativeController::GetControlName(input.Control), input.Control));
 
-        if (g_menu.OptionPlus(fmt::format("Assign {}", input.Name), controllerInfo, nullptr, std::bind(clearLControllerButton, input.ConfigTag), nullptr, "Current setting")) {
+        if (g_menu.OptionPlus(fmt::format(lang.Tr("controller.bindings.assign"), input.Name), controllerInfo, nullptr, std::bind(clearLControllerButton, input.ConfigTag), nullptr, lang.Tr("controller.bindings.currentsetting"))) {
             WAIT(500);
             bool result = configLControllerButton(input.ConfigTag);
             if (!result)
-                UI::Notify(WARN, fmt::format("Cancelled {} assignment", input.Name));
+                UI::Notify(WARN, fmt::format(lang.Tr("controller.bindings.cancelled"), input.Name));
             WAIT(500);
         }
         controllerInfo.pop_back();
@@ -714,8 +677,9 @@ void update_controllerbindingsnativemenu() {
 }
 
 void update_controllerbindingsxinputmenu() {
-    g_menu.Title("Controller bindings");
-    g_menu.Subtitle("XInput mode");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("controller.bindings.title"));
+    g_menu.Subtitle(lang.Tr("controller.bindings.xinputmode"));
 
     std::vector<std::string> blockableControlsHelp;
     const auto& blockableControls = BlockableControls::GetList();
@@ -725,34 +689,34 @@ void update_controllerbindingsxinputmenu() {
     }
 
     int oldIndexUp = BlockableControls::GetIndex(g_controls.ControlXboxBlocks[static_cast<int>(CarControls::ControllerControlType::ShiftUp)]);
-    if (g_menu.StringArray("Shift Up blocks", blockableControlsHelp, oldIndexUp)) {
+    if (g_menu.StringArray(lang.Tr("controller.bindings.shiftupblocks"), blockableControlsHelp, oldIndexUp)) {
         g_controls.ControlXboxBlocks[static_cast<int>(CarControls::ControllerControlType::ShiftUp)] = blockableControls[oldIndexUp].Control;
     }
 
     int oldIndexDown = BlockableControls::GetIndex(g_controls.ControlXboxBlocks[static_cast<int>(CarControls::ControllerControlType::ShiftDown)]);
-    if (g_menu.StringArray("Shift Down blocks", blockableControlsHelp, oldIndexDown)) {
+    if (g_menu.StringArray(lang.Tr("controller.bindings.shiftdownblocks"), blockableControlsHelp, oldIndexDown)) {
         g_controls.ControlXboxBlocks[static_cast<int>(CarControls::ControllerControlType::ShiftDown)] = blockableControls[oldIndexDown].Control;
     }
 
     int oldIndexClutch = BlockableControls::GetIndex(g_controls.ControlXboxBlocks[static_cast<int>(CarControls::ControllerControlType::Clutch)]);
-    if (g_menu.StringArray("Clutch blocks", blockableControlsHelp, oldIndexClutch)) {
+    if (g_menu.StringArray(lang.Tr("controller.bindings.clutchblocks"), blockableControlsHelp, oldIndexClutch)) {
         g_controls.ControlXboxBlocks[static_cast<int>(CarControls::ControllerControlType::Clutch)] = blockableControls[oldIndexClutch].Control;
     }
 
     std::vector<std::string> controllerInfo = {
-        "Press RIGHT to clear key",
-        "Press RETURN to configure button",
+        lang.Tr("controller.bindings.pressrightclear"),
+        lang.Tr("controller.bindings.pressreturnconfig"),
         "",
     };
 
     for (const auto& input : g_controls.ControlXbox) {
         controllerInfo.back() = input.Description;
-        controllerInfo.push_back(fmt::format("Assigned to {}", input.Control));
-        if (g_menu.OptionPlus(fmt::format("Assign {}", input.Name), controllerInfo, nullptr, std::bind(clearControllerButton, input.ConfigTag), nullptr, "Current setting")) {
+        controllerInfo.push_back(fmt::format(lang.Tr("controller.bindings.assignedtoxbox"), input.Control));
+        if (g_menu.OptionPlus(fmt::format(lang.Tr("controller.bindings.assign"), input.Name), controllerInfo, nullptr, std::bind(clearControllerButton, input.ConfigTag), nullptr, lang.Tr("controller.bindings.currentsetting"))) {
             WAIT(500);
             bool result = configControllerButton(input.ConfigTag);
             if (!result)
-                UI::Notify(WARN, fmt::format("Cancelled {} assignment", input.Name));
+                UI::Notify(WARN, fmt::format(lang.Tr("controller.bindings.cancelled"), input.Name));
             WAIT(500);
         }
         controllerInfo.pop_back();
@@ -760,12 +724,13 @@ void update_controllerbindingsxinputmenu() {
 }
 
 void update_keyboardmenu() {
-    g_menu.Title("Keyboard bindings");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("keyboard.title"));
     g_menu.Subtitle("");
 
     std::vector<std::string> keyboardInfo = {
-        "Press RIGHT to clear key",
-        "Active inputs:",
+        lang.Tr("keyboard.pressrightclear"),
+        lang.Tr("keyboard.activeinputs"),
     };
 
     for (uint32_t i = 0; i < static_cast<uint32_t>(CarControls::KeyboardControlType::SIZEOF_KeyboardControlType); ++i) {
@@ -775,16 +740,16 @@ void update_keyboardmenu() {
             keyboardInfo.emplace_back(input.Name);
     }
     if (keyboardInfo.size() == 2)
-        keyboardInfo.emplace_back("None");
+        keyboardInfo.emplace_back(lang.Tr("keyboard.none"));
 
     for (const auto& input : g_controls.KBControl) {
-        keyboardInfo.push_back(fmt::format("Assigned to {}", GetNameFromKey(input.Control)));
-        if (g_menu.OptionPlus(fmt::format("Assign {}", input.Name), keyboardInfo, nullptr, std::bind(clearKeyboardKey, input.ConfigTag), nullptr, "Current setting")) {
+        keyboardInfo.push_back(fmt::format(lang.Tr("keyboard.assignedto"), GetNameFromKey(input.Control)));
+        if (g_menu.OptionPlus(fmt::format(lang.Tr("keyboard.assign"), input.Name), keyboardInfo, nullptr, std::bind(clearKeyboardKey, input.ConfigTag), nullptr, lang.Tr("keyboard.currentsetting"))) {
             WAIT(500);
             bool result = configKeyboardKey(input.ConfigTag);
             UI::Notify(WARN, result ?
-                fmt::format("[{}] saved", input.Name) :
-                fmt::format("[{}] cancelled", input.Name));
+                fmt::format(lang.Tr("keyboard.saved"), input.Name) :
+                fmt::format(lang.Tr("keyboard.cancelled"), input.Name));
             WAIT(500);
         }
         keyboardInfo.pop_back();
@@ -792,15 +757,16 @@ void update_keyboardmenu() {
 }
 
 void update_wheelmenu() {
-    g_menu.Title("Wheel & pedals");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("wheelmenu.title"));
     auto wheelGuid = g_controls.WheelAxes[static_cast<int>(CarControls::WheelAxisType::Steer)].Guid;
     g_menu.Subtitle(FormatDeviceGuidName(wheelGuid));
 
     if (!g_controls.FreeDevices.empty()) {
         for (const auto& device : g_controls.FreeDevices) {
             if (g_menu.Option(device.name, NativeMenu::solidGreen,
-                { "~r~<b>This device can be used as input device!</b>~w~",
-                  "Set it up with the options below, or press Select to discard this message." })) {
+                { lang.Tr("wheelmenu.devicefound"),
+                  lang.Tr("wheelmenu.devicefound.desc") })) {
                 saveAllSettings();
                 g_settings.SteeringAppendDevice(device.guid, device.name);
                 g_settings.Read(&g_controls);
@@ -809,101 +775,103 @@ void update_wheelmenu() {
         }
     }
 
-    if (g_menu.BoolOption("Enable wheel", g_settings.Wheel.Options.Enable,
-        { "Enable usage of a steering wheel and pedals." })) {
+    if (g_menu.BoolOption(lang.Tr("wheelmenu.enable"), g_settings.Wheel.Options.Enable,
+        { lang.Tr("wheelmenu.enable.desc") })) {
         saveAllSettings();
         g_settings.Read(&g_controls);
         initWheel();
     }
 
-    if (g_menu.BoolOption("Logitech RPM LEDs", g_settings.Wheel.Options.LogiLEDs,
-        { "Show the RPM LEDs on Logitech steering wheels.",
-            "If the wheel doesn't have compatible RPM LEDs, this might crash." })) {
+    if (g_menu.BoolOption(lang.Tr("wheelmenu.logiled"), g_settings.Wheel.Options.LogiLEDs,
+        { lang.Tr("wheelmenu.logiled.desc1"),
+            lang.Tr("wheelmenu.logiled.desc2") })) {
         g_settings.SaveWheel();
     }
 
-    g_menu.MenuOption("Analog input setup", "axesmenu",
-        { "Configure the analog inputs." });
+    g_menu.MenuOption(lang.Tr("wheelmenu.analogsetup"), "axesmenu",
+        { lang.Tr("wheelmenu.analogsetup.desc") });
 
-    g_menu.MenuOption("Force feedback options", "forcefeedbackmenu",
-        { "Fine-tune your force feedback parameters." });
+    g_menu.MenuOption(lang.Tr("wheelmenu.ffboptions"), "forcefeedbackmenu",
+        { lang.Tr("wheelmenu.ffboptions.desc") });
 
-    g_menu.MenuOption("Soft lock options", "anglemenu",
-        { "Set up soft lock options here." });
+    g_menu.MenuOption(lang.Tr("wheelmenu.softlockoptions"), "anglemenu",
+        { lang.Tr("wheelmenu.softlockoptions.desc") });
 
-    g_menu.MenuOption("Button input setup", "buttonsmenu",
-        { "Set up your buttons on your steering wheel." });
+    g_menu.MenuOption(lang.Tr("wheelmenu.buttonsetup"), "buttonsmenu",
+        { lang.Tr("wheelmenu.buttonsetup.desc") });
 
     std::vector<std::string> hpatInfo = {
-        "Press RIGHT to clear H-pattern shifter",
-        "Active gear:"
+        lang.Tr("wheelmenu.hpattern.clear"),
+        lang.Tr("wheelmenu.hpattern.activegear")
     };
-    if (g_controls.ButtonIn(CarControls::WheelControlType::HR)) hpatInfo.emplace_back("Reverse");
+    if (g_controls.ButtonIn(CarControls::WheelControlType::HR)) hpatInfo.emplace_back(lang.Tr("wheelmenu.hpattern.reverse"));
     for (uint8_t gear = 1; gear < VExt::GearsAvailable(); ++gear) {
         // H1 == 1
         if (g_controls.ButtonIn(static_cast<CarControls::WheelControlType>(gear))) 
-            hpatInfo.emplace_back(fmt::format("Gear {}", gear));
+            hpatInfo.emplace_back(fmt::format(lang.Tr("wheelmenu.hpattern.gear"), gear));
     }
 
-    if (g_menu.OptionPlus("H-pattern shifter setup", hpatInfo, nullptr, std::bind(clearHShifter), nullptr, "Input values",
-        { "Select this option to start H-pattern shifter setup. Follow the on-screen instructions." })) {
+    if (g_menu.OptionPlus(lang.Tr("wheelmenu.hpattern.setup"), hpatInfo, nullptr, std::bind(clearHShifter), nullptr, lang.Tr("wheelmenu.hpattern.inputvalues"),
+        { lang.Tr("wheelmenu.hpattern.setup.desc") })) {
         bool result = configHPattern();
-        UI::Notify(WARN, result ? "H-pattern shifter saved" : "Cancelled H-pattern shifter setup");
+        UI::Notify(WARN, result ? lang.Tr("wheelmenu.hpattern.saved") : lang.Tr("wheelmenu.hpattern.cancelled"));
     }
 
-    g_menu.BoolOption("Use shifter for automatic", g_settings.Wheel.Options.UseShifterForAuto,
-        { "Use the H-pattern shifter to select the Drive/Reverse gears." });
+    g_menu.BoolOption(lang.Tr("wheelmenu.shifterauto"), g_settings.Wheel.Options.UseShifterForAuto,
+        { lang.Tr("wheelmenu.shifterauto.desc") });
 
     std::vector<std::string> hAutoInfo = {
-        "Press RIGHT to clear H-pattern auto",
-        "Active gear:"
+        lang.Tr("wheelmenu.hpattern.autoclear"),
+        lang.Tr("wheelmenu.hpattern.activegear")
     };
-    if (g_controls.ButtonIn(CarControls::WheelControlType::APark)) hAutoInfo.emplace_back("Auto Park");
-    if (g_controls.ButtonIn(CarControls::WheelControlType::AReverse)) hAutoInfo.emplace_back("Auto Reverse");
-    if (g_controls.ButtonIn(CarControls::WheelControlType::ANeutral)) hAutoInfo.emplace_back("Auto Neutral");
-    if (g_controls.ButtonIn(CarControls::WheelControlType::ADrive)) hAutoInfo.emplace_back("Auto Drive");
+    if (g_controls.ButtonIn(CarControls::WheelControlType::APark)) hAutoInfo.emplace_back(lang.Tr("wheelmenu.hpattern.autopark"));
+    if (g_controls.ButtonIn(CarControls::WheelControlType::AReverse)) hAutoInfo.emplace_back(lang.Tr("wheelmenu.hpattern.autoreverse"));
+    if (g_controls.ButtonIn(CarControls::WheelControlType::ANeutral)) hAutoInfo.emplace_back(lang.Tr("wheelmenu.hpattern.autoneutral"));
+    if (g_controls.ButtonIn(CarControls::WheelControlType::ADrive)) hAutoInfo.emplace_back(lang.Tr("wheelmenu.hpattern.autodrive"));
 
-    if (g_menu.OptionPlus("Shifter setup for automatic", hAutoInfo, nullptr, [] { clearASelect(); }, nullptr, "Input values",
-        { "Set up H-pattern shifter for automatic gearbox. Follow the on-screen instructions." })) {
+    if (g_menu.OptionPlus(lang.Tr("wheelmenu.hpattern.autosetup"), hAutoInfo, nullptr, [] { clearASelect(); }, nullptr, lang.Tr("wheelmenu.hpattern.inputvalues"),
+        { lang.Tr("wheelmenu.hpattern.autosetup.desc") })) {
         bool result = configASelect();
-        UI::Notify(WARN, result ? "H-pattern shifter (auto) saved" : "Cancelled H-pattern shifter (auto) setup");
+        UI::Notify(WARN, result ? lang.Tr("wheelmenu.hpattern.autosaved") : lang.Tr("wheelmenu.hpattern.autocancelled"));
     }
 
-    g_menu.BoolOption("Keyboard H-pattern", g_settings.Wheel.Options.HPatternKeyboard,
-        { "This allows you to use the keyboard for H-pattern shifting. Configure the controls in the keyboard section." });
+    g_menu.BoolOption(lang.Tr("wheelmenu.kbhpattern"), g_settings.Wheel.Options.HPatternKeyboard,
+        { lang.Tr("wheelmenu.kbhpattern.desc") });
 }
 
 void update_anglemenu() {
-    g_menu.Title("Soft lock");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("anglemenu.title"));
     g_menu.Subtitle("");
     float minLock = 180.0f;
-    if (g_menu.FloatOption("Physical degrees", g_settings.Wheel.Steering.AngleMax, minLock, 2880.0f, 30.0f,
-        { "How many degrees your physical steering steering wheel turns.",
-            "Set this to whatever matches the setting in the wheel driver." })) {
+    if (g_menu.FloatOption(lang.Tr("anglemenu.physicaldeg"), g_settings.Wheel.Steering.AngleMax, minLock, 2880.0f, 30.0f,
+        { lang.Tr("anglemenu.physicaldeg.desc1"),
+            lang.Tr("anglemenu.physicaldeg.desc2") })) {
         if (g_settings.Wheel.Steering.AngleCar > g_settings.Wheel.Steering.AngleMax) { g_settings.Wheel.Steering.AngleCar = g_settings.Wheel.Steering.AngleMax; }
         if (g_settings.Wheel.Steering.AngleBike > g_settings.Wheel.Steering.AngleMax) { g_settings.Wheel.Steering.AngleBike = g_settings.Wheel.Steering.AngleMax; }
         if (g_settings.Wheel.Steering.AngleBoat > g_settings.Wheel.Steering.AngleMax) { g_settings.Wheel.Steering.AngleBoat = g_settings.Wheel.Steering.AngleMax; }
     }
 
-    g_menu.FloatOption("Car soft lock", g_settings.Wheel.Steering.AngleCar, minLock, g_settings.Wheel.Steering.AngleMax, 30.0,
-        { "Soft lock for generic cars and trucks. (degrees)",
-            "Overridden by vehicle-specific soft lock." });
+    g_menu.FloatOption(lang.Tr("anglemenu.carsoftlock"), g_settings.Wheel.Steering.AngleCar, minLock, g_settings.Wheel.Steering.AngleMax, 30.0,
+        { lang.Tr("anglemenu.carsoftlock.desc1"),
+            lang.Tr("anglemenu.carsoftlock.desc2") });
 
-    g_menu.FloatOption("Bike soft lock", g_settings.Wheel.Steering.AngleBike, minLock, g_settings.Wheel.Steering.AngleMax, 30.0,
-        { "Soft lock for generic bikes and quads. (degrees)",
-            "Overridden by vehicle-specific soft lock." });
+    g_menu.FloatOption(lang.Tr("anglemenu.bikesoftlock"), g_settings.Wheel.Steering.AngleBike, minLock, g_settings.Wheel.Steering.AngleMax, 30.0,
+        { lang.Tr("anglemenu.bikesoftlock.desc1"),
+            lang.Tr("anglemenu.bikesoftlock.desc2") });
 
-    g_menu.FloatOption("Boat soft lock", g_settings.Wheel.Steering.AngleBoat, minLock, g_settings.Wheel.Steering.AngleMax, 30.0,
-        { "Soft lock for generic boats. (degrees)",
-            "Overridden by vehicle-specific soft lock." });
+    g_menu.FloatOption(lang.Tr("anglemenu.boatsoftlock"), g_settings.Wheel.Steering.AngleBoat, minLock, g_settings.Wheel.Steering.AngleMax, 30.0,
+        { lang.Tr("anglemenu.boatsoftlock.desc1"),
+            lang.Tr("anglemenu.boatsoftlock.desc2") });
 }
 
 void update_axesmenu() {
-    g_menu.Title("Analog inputs");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("axesmenu.title"));
     g_menu.Subtitle("");
     g_controls.UpdateValues(CarControls::Wheel, true);
     std::vector<std::string> info = {
-        "Press RIGHT to clear this axis" ,
+        lang.Tr("axesmenu.clearaxis"),
         fmt::format("Steer:\t\t{:.3f}", g_controls.SteerVal),
         fmt::format("Throttle:\t\t{:.3f}", g_controls.ThrottleVal),
         fmt::format("Brake:\t\t{:.3f}", g_controls.BrakeVal),
@@ -922,116 +890,117 @@ void update_axesmenu() {
         bool selected = false;
 
         if (g_menu.OptionPlus(
-            fmt::format("Configure {}", input.Name),
+            fmt::format(lang.Tr("axesmenu.configure"), input.Name),
             {},
             &selected,
             [&input] { return clearAxis(input.ConfigTag); }, 
             nullptr, 
-            "Input values")) {
+            lang.Tr("axesmenu.inputvalues"))) {
             bool result = configAxis(input.ConfigTag);
             UI::Notify(WARN, result ? 
-                fmt::format("[{}] saved", input.Name) : 
-                fmt::format("[{}] cancelled", input.Name));
+                fmt::format(lang.Tr("axesmenu.saved"), input.Name) : 
+                fmt::format(lang.Tr("axesmenu.cancelled"), input.Name));
             if (result)
                 initWheel();
         }
 
         if (selected) {
             if (!input.Control.empty() && input.Guid != GUID_NULL) {
-                info.push_back(fmt::format("{} assigned to", input.Name));
-                info.push_back(fmt::format("Device: {}", FormatDeviceGuidName(input.Guid)));
-                info.push_back(fmt::format("Axis: {}", input.Control));
+                info.push_back(fmt::format(lang.Tr("axesmenu.assignedto"), input.Name));
+                info.push_back(fmt::format("{} {}", lang.Tr("axesmenu.device"), FormatDeviceGuidName(input.Guid)));
+                info.push_back(fmt::format("{} {}", lang.Tr("axesmenu.axis"), input.Control));
             }
             else {
-                info.push_back(fmt::format("{} unassigned", input.Name));
+                info.push_back(fmt::format(lang.Tr("axesmenu.unassigned"), input.Name));
             }
 
-            g_menu.OptionPlusPlus(info, "Input values");
+            g_menu.OptionPlusPlus(info, lang.Tr("axesmenu.inputvalues"));
         }
     }
 
-    g_menu.FloatOption("Steering deadzone", g_settings.Wheel.Steering.DeadZone, 0.0f, 0.5f, 0.01f,
-        { "Deadzone size, from the center of the wheel." });
+    g_menu.FloatOption(lang.Tr("axesmenu.steerdeadzone"), g_settings.Wheel.Steering.DeadZone, 0.0f, 0.5f, 0.01f,
+        { lang.Tr("axesmenu.steerdeadzone.desc") });
 
-    g_menu.FloatOption("Steering deadzone offset", g_settings.Wheel.Steering.DeadZoneOffset, -0.5f, 0.5f, 0.01f,
-        { "Put the deadzone with an offset from the center." });
+    g_menu.FloatOption(lang.Tr("axesmenu.steerdeadzoneoffset"), g_settings.Wheel.Steering.DeadZoneOffset, -0.5f, 0.5f, 0.01f,
+        { lang.Tr("axesmenu.steerdeadzoneoffset.desc") });
 
-    g_menu.FloatOption("Throttle anti-deadzone", g_settings.Wheel.Throttle.AntiDeadZone, 0.0f, 1.0f, 0.01f,
-        { "GTA V ignores 25% input for analog controls by default." });
+    g_menu.FloatOption(lang.Tr("axesmenu.throttlead"), g_settings.Wheel.Throttle.AntiDeadZone, 0.0f, 1.0f, 0.01f,
+        { lang.Tr("axesmenu.antideadzone.desc") });
 
-    g_menu.FloatOption("Brake anti-deadzone", g_settings.Wheel.Brake.AntiDeadZone, 0.0f, 1.0f, 0.01f,
-        { "GTA V ignores 25% input for analog controls by default." });
+    g_menu.FloatOption(lang.Tr("axesmenu.brakead"), g_settings.Wheel.Brake.AntiDeadZone, 0.0f, 1.0f, 0.01f,
+        { lang.Tr("axesmenu.antideadzone.desc") });
 
     bool showBrakeGammaBox = false;
     std::vector<std::string> extras = {};
-    g_menu.OptionPlus("Brake gamma", extras, &showBrakeGammaBox,
+    g_menu.OptionPlus(lang.Tr("axesmenu.brakegamma"), extras, &showBrakeGammaBox,
         [=] { return incVal(g_settings.Wheel.Brake.Gamma, 5.0f, 0.01f); },
         [=] { return decVal(g_settings.Wheel.Brake.Gamma, 0.1f, 0.01f); },
-        "Brake gamma",
-        { "Linearity of the brake pedal. Values over 1.0 feel more real if you have progressive springs." });
+        lang.Tr("axesmenu.brakegamma"),
+        { lang.Tr("axesmenu.brakegamma.desc") });
 
     if (showBrakeGammaBox) {
         extras = ShowGammaCurve("Brake", g_controls.BrakeVal, g_settings.Wheel.Brake.Gamma);
-        g_menu.OptionPlusPlus(extras, "Brake gamma");
+        g_menu.OptionPlusPlus(extras, lang.Tr("axesmenu.brakegamma"));
     }
 
     bool showThrottleGammaBox = false;
     extras = {};
-    g_menu.OptionPlus("Throttle gamma", extras, &showThrottleGammaBox,
+    g_menu.OptionPlus(lang.Tr("axesmenu.throttlegamma"), extras, &showThrottleGammaBox,
         [=] { return incVal(g_settings.Wheel.Throttle.Gamma, 5.0f, 0.01f); },
         [=] { return decVal(g_settings.Wheel.Throttle.Gamma, 0.1f, 0.01f); },
-        "Throttle gamma",
-        { "Linearity of the throttle pedal." });
+        lang.Tr("axesmenu.throttlegamma"),
+        { lang.Tr("axesmenu.throttlegamma.desc") });
 
     if (showThrottleGammaBox) {
         extras = ShowGammaCurve("Throttle", g_controls.ThrottleVal, g_settings.Wheel.Throttle.Gamma);
-        g_menu.OptionPlusPlus(extras, "Throttle gamma");
+        g_menu.OptionPlusPlus(extras, lang.Tr("axesmenu.throttlegamma"));
     }
 
     bool showSteeringGammaBox = false;
     extras = {};
-    g_menu.OptionPlus("Steering gamma", extras, &showSteeringGammaBox,
+    g_menu.OptionPlus(lang.Tr("axesmenu.steergamma"), extras, &showSteeringGammaBox,
         [=] { return incVal(g_settings.Wheel.Steering.Gamma, 5.0f, 0.01f); },
         [=] { return decVal(g_settings.Wheel.Steering.Gamma, 0.1f, 0.01f); },
-        "Steering gamma",
-        { "Linearity of the steering wheel." });
+        lang.Tr("axesmenu.steergamma"),
+        { lang.Tr("axesmenu.steergamma.desc") });
 
     if (showSteeringGammaBox) {
         float steerValL = map(g_controls.SteerVal, 0.0f, 0.5f, 1.0f, 0.0f);
         float steerValR = map(g_controls.SteerVal, 0.5f, 1.0f, 0.0f, 1.0f);
         float steerVal = g_controls.SteerVal < 0.5f ? steerValL : steerValR;
         extras = ShowGammaCurve("Steering", steerVal, g_settings.Wheel.Steering.Gamma);
-        g_menu.OptionPlusPlus(extras, "Steering gamma");
+        g_menu.OptionPlusPlus(extras, lang.Tr("axesmenu.steergamma"));
     }
 }
 
 void update_forcefeedbackmenu() {
-    g_menu.Title("Force feedback");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("ffbmenu.title"));
     g_menu.Subtitle("");
 
-    g_menu.BoolOption("Enable", g_settings.Wheel.FFB.Enable,
-        { "Enable or disable force feedback entirely." });
+    g_menu.BoolOption(lang.Tr("ffbmenu.enable"), g_settings.Wheel.FFB.Enable,
+        { lang.Tr("ffbmenu.enable.desc") });
 
-    g_menu.FloatOption("FFB SAT scale", g_settings.Wheel.FFB.SATAmpMult, 0.05f, 10.0f, 0.05f,
-        { "Overall FFB scaling for self-aligning torque.",
-            "Recommended to leave at 1.0 and use FFB response to tune FFB.",
-            "Values over 1.0 clips FFB. Lower values decrease overall SAT FFB strength.",
-            "Note: Final SAT scale affected by vehicle-specific multiplier." });
+    g_menu.FloatOption(lang.Tr("ffbmenu.satscale"), g_settings.Wheel.FFB.SATAmpMult, 0.05f, 10.0f, 0.05f,
+        { lang.Tr("ffbmenu.satscale.desc1"),
+            lang.Tr("ffbmenu.satscale.desc2"),
+            lang.Tr("ffbmenu.satscale.desc3"),
+            lang.Tr("ffbmenu.satscale.desc4") });
 
-    g_menu.StringArray("FFB linearity type", { ffbCurveTypes }, g_settings.Wheel.FFB.FFBProfile,
-        { "Both types allow modifying the FFB response.",
-            "Gamma normally adjusts the curve.",
-            "Boosted has a default initial ramp-up." });
+    g_menu.StringArray(lang.Tr("ffbmenu.linearitytype"), { ffbCurveTypes }, g_settings.Wheel.FFB.FFBProfile,
+        { lang.Tr("ffbmenu.linearitytype.desc1"),
+            lang.Tr("ffbmenu.linearitytype.desc2"),
+            lang.Tr("ffbmenu.linearitytype.desc3") });
 
     bool showDynamicFfbCurveBox = false;
-    if (g_menu.OptionPlus(fmt::format("FFB response curve: < {:.2f} >", g_settings.Wheel.FFB.ResponseCurve), {}, &showDynamicFfbCurveBox,
+    if (g_menu.OptionPlus(fmt::format(lang.Tr("ffbmenu.responsecurve"), g_settings.Wheel.FFB.ResponseCurve), {}, &showDynamicFfbCurveBox,
             [=] { return incVal(g_settings.Wheel.FFB.ResponseCurve, 5.00f, 0.01f); },
             [=] { return decVal(g_settings.Wheel.FFB.ResponseCurve, 0.01f, 0.01f); },
-            "Response curve", {
-                "Response curve of the self-aligning torque.",
-                "Decrease to ramp up force quicker.",
-                "Increase to get a more linear force buildup.",
-                "Note: Final force curve affected by vehicle-specific multiplier." })) {
+            lang.Tr("ffbmenu.responsecurve"), {
+                lang.Tr("ffbmenu.responsecurve.desc1"),
+                lang.Tr("ffbmenu.responsecurve.desc2"),
+                lang.Tr("ffbmenu.responsecurve.desc3"),
+                lang.Tr("ffbmenu.responsecurve.desc4") })) {
         float val = g_settings.Wheel.FFB.ResponseCurve;
         if (GetKbEntryFloat(val)) {
             g_settings.Wheel.FFB.ResponseCurve = val;
@@ -1042,44 +1011,44 @@ void update_forcefeedbackmenu() {
         auto extras = ShowDynamicFfbCurve(abs(WheelInput::GetFFBConstantForce()),
                                           g_settings.Wheel.FFB.ResponseCurve,
                                           g_settings.Wheel.FFB.FFBProfile);
-        g_menu.OptionPlusPlus(extras, "Response Curve");
+        g_menu.OptionPlusPlus(extras, lang.Tr("ffbmenu.responsecurve"));
     }
 
-    g_menu.FloatOption("Detail effect multiplier", g_settings.Wheel.FFB.DetailMult, 0.0f, 10.0f, 0.1f,
-        { "Force feedback caused by the suspension.",
-          "This force stacks on top of the main SAT force." });
+    g_menu.FloatOption(lang.Tr("ffbmenu.detailmult"), g_settings.Wheel.FFB.DetailMult, 0.0f, 10.0f, 0.1f,
+        { lang.Tr("ffbmenu.detailmult.desc1"),
+          lang.Tr("ffbmenu.detailmult.desc2") });
 
-    g_menu.IntOption("Detail effect limit", g_settings.Wheel.FFB.DetailLim, 0, 20000, 100, 
-        { "Clamp detail force to this value.",
-          "20000 allows maxing out detail force in the other direction the SAT is acting on." });
+    g_menu.IntOption(lang.Tr("ffbmenu.detaillim"), g_settings.Wheel.FFB.DetailLim, 0, 20000, 100, 
+        { lang.Tr("ffbmenu.detaillim.desc1"),
+          lang.Tr("ffbmenu.detaillim.desc2") });
 
-    g_menu.IntOption("Detail effect averaging", g_settings.Wheel.FFB.DetailMAW, 1, 100, 1,
-        { "Averages the detail force to prevent force feedback spikes.",
-        "Recommended to keep as low as possible, as detail is lost with higher values."});
+    g_menu.IntOption(lang.Tr("ffbmenu.detailmaw"), g_settings.Wheel.FFB.DetailMAW, 1, 100, 1,
+        { lang.Tr("ffbmenu.detailmaw.desc1"),
+        lang.Tr("ffbmenu.detailmaw.desc2")});
 
-    g_menu.FloatOption("Collision effect multiplier", g_settings.Wheel.FFB.CollisionMult, 0.0f, 10.0f, 0.1f,
-        { "Force feedback effect caused by frontal/rear collisions." });
+    g_menu.FloatOption(lang.Tr("ffbmenu.collisionmult"), g_settings.Wheel.FFB.CollisionMult, 0.0f, 10.0f, 0.1f,
+        { lang.Tr("ffbmenu.collisionmult.desc") });
 
-    g_menu.IntOption("Damper max (low speed)", g_settings.Wheel.FFB.DamperMax, 0, 200, 1,
-        { "Wheel friction at low speed." });
+    g_menu.IntOption(lang.Tr("ffbmenu.dampermax"), g_settings.Wheel.FFB.DamperMax, 0, 200, 1,
+        { lang.Tr("ffbmenu.dampermax.desc") });
 
-    g_menu.IntOption("Damper min (high speed)", g_settings.Wheel.FFB.DamperMin, 0, 200, 1,
-        { "Wheel friction at high speed." });
+    g_menu.IntOption(lang.Tr("ffbmenu.dampermin"), g_settings.Wheel.FFB.DamperMin, 0, 200, 1,
+        { lang.Tr("ffbmenu.dampermin.desc") });
 
-    g_menu.FloatOption("Damper min speed", g_settings.Wheel.FFB.DamperMinSpeed, 0.0f, 40.0f, 0.2f,
-        { "Speed where the damper strength should be minimal.", "In m/s." });
+    g_menu.FloatOption(lang.Tr("ffbmenu.damperminspeed"), g_settings.Wheel.FFB.DamperMinSpeed, 0.0f, 40.0f, 0.2f,
+        { lang.Tr("ffbmenu.damperminspeed.desc1"), lang.Tr("ffbmenu.damperminspeed.desc2") });
 
     if (g_settings.Wheel.FFB.LUTFile.empty()) {
-        if (g_menu.Option("FFB LUT inactive", {
-            "Use an FFB lookup table (LUT) to customize FFB response, and correct the non-linear response of your wheels' motors.",
-            "Select to open the readme on how to activate this."
+        if (g_menu.Option(lang.Tr("ffbmenu.lutinactive"), {
+            lang.Tr("ffbmenu.lutinactive.desc1"),
+            lang.Tr("ffbmenu.lutinactive.desc2")
         })) {
             WAIT(20);
             PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, ControlFrontendPause, 1.0f);
             ShellExecuteA(0, 0, "https://github.com/E66666666/GTAVManualTransmission/blob/master/doc/README.md#wheel-ffb-lut", 0, 0, SW_SHOW);
         }
 
-        if (g_menu.Option("Tune FFB anti-deadzone")) {
+        if (g_menu.Option(lang.Tr("ffbmenu.tuneantideadzone"))) {
             g_controls.PlayFFBCollision(0);
             g_controls.PlayFFBDynamics(0, 0);
             while (true) {
@@ -1104,112 +1073,113 @@ void update_forcefeedbackmenu() {
 
                 g_controls.PlayFFBDynamics(g_settings.Wheel.FFB.AntiDeadForce, 0);
 
-                UI::ShowHelpText(fmt::format("Press [Left] and [Right] to decrease and increase force feedback anti-deadzone. "
-                    "Use the highest value before your wheel starts moving. Currently [{}]. Press [{}] to exit.", g_settings.Wheel.FFB.AntiDeadForce, escapeKey));
+                UI::ShowHelpText(fmt::format(lang.Tr("ffbmenu.tuneantideadzone.help"), g_settings.Wheel.FFB.AntiDeadForce, escapeKey));
                 WAIT(0);
             }
         }
     }
     else {
-        g_menu.Option("FFB LUT active", {
-            fmt::format("Using LUT: {}", g_settings.Wheel.FFB.LUTFile),
-            "FFB anti-deadzone disabled."
+        g_menu.Option(lang.Tr("ffbmenu.lutactive"), {
+            fmt::format("{} {}", lang.Tr("ffbmenu.usinglut"), g_settings.Wheel.FFB.LUTFile),
+            lang.Tr("ffbmenu.lutactive.desc")
         });
     }
 
-    g_menu.MenuOption("FFB normalization options", "ffbnormalizationmenu",
-        { "Different fTractionCurveLateral values affect FFB response.",
-          "These values normalize the steering forces across different handlings." });
+    g_menu.MenuOption(lang.Tr("ffbmenu.normalization"), "ffbnormalizationmenu",
+        { lang.Tr("ffbmenu.normalization.desc1"),
+          lang.Tr("ffbmenu.normalization.desc2") });
 
     if (g_settings.Debug.ShowAdvancedFFBOptions) {
-        g_menu.OptionPlus("Legacy FFB options:",
-            { "This is an old FFB implementation, based on movement versus steering inputs.",
-              "Road vehicles use better FFB with wheel data, but old FFB is still used for non-road vehicles." });
+        g_menu.OptionPlus(lang.Tr("ffbmenu.legacyoptions"),
+            { lang.Tr("ffbmenu.legacyoptions.desc1"),
+              lang.Tr("ffbmenu.legacyoptions.desc2") });
 
-        g_menu.FloatOption("SAT factor", g_settings.Wheel.FFB.SATFactor, 0.0f, 1.0f, 0.01f,
-            { "Reactive force offset/multiplier, when not going straight.",
-              "Depending on wheel strength, a larger value helps reaching countersteer faster or reduce overcorrection." });
+        g_menu.FloatOption(lang.Tr("ffbmenu.satfactor"), g_settings.Wheel.FFB.SATFactor, 0.0f, 1.0f, 0.01f,
+            { lang.Tr("ffbmenu.satfactor.desc1"),
+              lang.Tr("ffbmenu.satfactor.desc2") });
 
-        g_menu.FloatOption("SAT gamma", g_settings.Wheel.FFB.Gamma, 0.01f, 2.0f, 0.01f,
-            { "< 1.0: More FFB at low speeds, FFB tapers off towards speed cap.",
-              "> 1.0: Less FFB at low speeds, FFB increases towards speed cap.",
-              "Keep at 1.0 for linear response. ~h~Not~h~ recommended to go higher than 1.0!" });
+        g_menu.FloatOption(lang.Tr("ffbmenu.satgamma"), g_settings.Wheel.FFB.Gamma, 0.01f, 2.0f, 0.01f,
+            { lang.Tr("ffbmenu.satgamma.desc1"),
+              lang.Tr("ffbmenu.satgamma.desc2"),
+              lang.Tr("ffbmenu.satgamma.desc3") });
 
-        g_menu.FloatOption("SAT max speed", g_settings.Wheel.FFB.MaxSpeed, 10.0f, 1000.0f, 1.0f,
-            { "Speed where FFB stops increasing. Helpful against too strong FFB at extreme speeds.",
-              fmt::format("{} kph / {} mph", g_settings.Wheel.FFB.MaxSpeed * 3.6f, g_settings.Wheel.FFB.MaxSpeed * 2.23694f) });
+        g_menu.FloatOption(lang.Tr("ffbmenu.satmaxspeed"), g_settings.Wheel.FFB.MaxSpeed, 10.0f, 1000.0f, 1.0f,
+            { lang.Tr("ffbmenu.satmaxspeed.desc"),
+              fmt::format("{:.0f} kph / {:.0f} mph", g_settings.Wheel.FFB.MaxSpeed * 3.6f, g_settings.Wheel.FFB.MaxSpeed * 2.23694f) });
     }
 }
 
 void update_ffbnormalizationmenu() {
-    g_menu.Title("FFB Normalization");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("ffbnorm.title"));
     g_menu.Subtitle("");
 
-    g_menu.OptionPlus("Description",
+    g_menu.OptionPlus(lang.Tr("ffbnorm.description"),
         {
-            "These values affect the usage of 'FFB response curve' value, relative to the fTractionCurveLateral (optimal slip angle) value of the vehicle.",
-            "Higher optimal slip angles cause FFB to respond slowly to small changes, lower optimal slip angles cause FFB to respond quick to small changes.",
-            "These values normalize this, to make the high slip values used by default GTA V handlings to respond quickly.",
-            "For the best experience, use a custom handling with low fTractionCurveMin/Max and low fTractionCurveLateral values.",
-            "No normalization: 5.0/1.0, 20.0/1.0",
-            "Default normalization: 7.5/1.6, 20.0/1.0"
+            lang.Tr("ffbnorm.description.desc1"),
+            lang.Tr("ffbnorm.description.desc2"),
+            lang.Tr("ffbnorm.description.desc3"),
+            lang.Tr("ffbnorm.description.desc4"),
+            lang.Tr("ffbnorm.description.nonorm"),
+            lang.Tr("ffbnorm.description.defnorm")
         }
     );
 
-    if (g_menu.Option("No normalization", { "Use this option to quickly disable normalization." })) {
+    if (g_menu.Option(lang.Tr("ffbnorm.nonormalization"), { lang.Tr("ffbnorm.nonormalization.desc") })) {
         g_settings.Wheel.FFB.SlipOptMin = 5.0f;
         g_settings.Wheel.FFB.SlipOptMinMult = 1.0f;
         g_settings.Wheel.FFB.SlipOptMax = 20.0f;
         g_settings.Wheel.FFB.SlipOptMaxMult = 1.0f;
     }
 
-    if (g_menu.Option("Default normalization", { "Use this option to quickly apply default normalization." })) {
+    if (g_menu.Option(lang.Tr("ffbnorm.defaultnormalization"), { lang.Tr("ffbnorm.defaultnormalization.desc") })) {
         g_settings.Wheel.FFB.SlipOptMin = 7.5f;
         g_settings.Wheel.FFB.SlipOptMinMult = 1.6f;
         g_settings.Wheel.FFB.SlipOptMax = 20.0f;
         g_settings.Wheel.FFB.SlipOptMaxMult = 1.0f;
     }
 
-    g_menu.FloatOptionCb("Optimal slip low", g_settings.Wheel.FFB.SlipOptMin, 0.0f, 90.0f, 0.1f, GetKbEntryFloat);
-    g_menu.FloatOptionCb("Optimal slip low mult", g_settings.Wheel.FFB.SlipOptMinMult, 0.0f, 10.0f, 0.1f, GetKbEntryFloat,
-        { "Higher values give weaker FFB at low steering angles.",
-          "For low optimal slip angles, this value should be high." });
-    g_menu.FloatOptionCb("Optimal slip high", g_settings.Wheel.FFB.SlipOptMax, 0.0f, 90.0f, 0.1f, GetKbEntryFloat);
-    g_menu.FloatOptionCb("Optimal slip high mult", g_settings.Wheel.FFB.SlipOptMaxMult, 0.0f, 10.0f, 0.1f, GetKbEntryFloat,
-        { "Higher values give weaker FFB at low steering angles.",
-          "For high optimal slip angles, this value should be low." });
+    g_menu.FloatOptionCb(lang.Tr("ffbnorm.slipoptlow"), g_settings.Wheel.FFB.SlipOptMin, 0.0f, 90.0f, 0.1f, GetKbEntryFloat);
+    g_menu.FloatOptionCb(lang.Tr("ffbnorm.slipoptlowmult"), g_settings.Wheel.FFB.SlipOptMinMult, 0.0f, 10.0f, 0.1f, GetKbEntryFloat,
+        { lang.Tr("ffbnorm.slipoptlowmult.desc1"),
+          lang.Tr("ffbnorm.slipoptlowmult.desc2") });
+    g_menu.FloatOptionCb(lang.Tr("ffbnorm.slipopthigh"), g_settings.Wheel.FFB.SlipOptMax, 0.0f, 90.0f, 0.1f, GetKbEntryFloat);
+    g_menu.FloatOptionCb(lang.Tr("ffbnorm.slipopthighmult"), g_settings.Wheel.FFB.SlipOptMaxMult, 0.0f, 10.0f, 0.1f, GetKbEntryFloat,
+        { lang.Tr("ffbnorm.slipopthighmult.desc1"),
+          lang.Tr("ffbnorm.slipopthighmult.desc2") });
 }
 
 void update_buttonsmenu() {
-    g_menu.Title("Buttons");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("buttonsmenu.title"));
     g_menu.Subtitle("");
 
     std::vector<std::string> wheelToKeyInfo = {
-        "Active wheel-to-key options:",
-        "Press RIGHT to clear all keys bound to button",
+        lang.Tr("buttonsmenu.wtk.active"),
+        lang.Tr("buttonsmenu.wtk.clear"),
     };
 
     if (g_controls.WheelToKey.empty()) {
-        wheelToKeyInfo.push_back("No keys assigned");
+        wheelToKeyInfo.push_back(lang.Tr("buttonsmenu.wtk.nokeys"));
     }
     for (const auto& input : g_controls.WheelToKey) {
         int index = g_settings.GUIDToDeviceIndex(input.Guid);
         std::string name = g_settings.GUIDToDeviceName(input.Guid);
         wheelToKeyInfo.push_back(fmt::format("DEV{}BUTTON{} = {} ({})", index, input.Control, input.ConfigTag, name));
         if (g_controls.GetWheel().IsButtonPressed(input.Control, input.Guid)) {
-            wheelToKeyInfo.back() = fmt::format("{} (Pressed)", wheelToKeyInfo.back());
+            wheelToKeyInfo.back() = fmt::format("{} ({})", wheelToKeyInfo.back(), lang.Tr("buttonsmenu.wtk.pressed"));
         }
     }
 
-    if (g_menu.OptionPlus("Set up WheelToKey", wheelToKeyInfo, nullptr, clearWheelToKey, nullptr, "Info",
-        { "Set up wheel buttons that press a keyboard key." })) {
+    if (g_menu.OptionPlus(lang.Tr("buttonsmenu.wtksetup"), wheelToKeyInfo, nullptr, clearWheelToKey, nullptr, lang.Tr("buttonsmenu.wtk.info"),
+        { lang.Tr("buttonsmenu.wtksetup.desc") })) {
         bool result = configWheelToKey();
-        UI::Notify(WARN, result ? "Entry added" : "Cancelled entry addition");
+        UI::Notify(WARN, result ? lang.Tr("buttonsmenu.wtk.added") : lang.Tr("buttonsmenu.wtk.cancelled"));
     }
 
     std::vector<std::string> buttonInfo;
-    buttonInfo.emplace_back("Press RIGHT to clear this button");
-    buttonInfo.emplace_back("Active buttons:");
+    buttonInfo.emplace_back(lang.Tr("buttonsmenu.clear"));
+    buttonInfo.emplace_back(lang.Tr("buttonsmenu.active"));
 
     for (uint32_t i = 0; i < static_cast<uint32_t>(CarControls::WheelControlType::SIZEOF_WheelControlType); ++i) {
         const auto& input = g_controls.WheelButton[i];
@@ -1223,7 +1193,7 @@ void update_buttonsmenu() {
             buttonInfo.emplace_back(input.Name);
     }
     if (buttonInfo.size() == 2)
-        buttonInfo.emplace_back("None");
+        buttonInfo.emplace_back(lang.Tr("buttonsmenu.none"));
 
     for (const auto& input : g_controls.WheelButton) {
         // Don't show the H-pattern shifter in this menu, it has its own options
@@ -1234,24 +1204,24 @@ void update_buttonsmenu() {
 
         bool popTwo = false;
         if (input.Control != -1) {
-            buttonInfo.push_back(fmt::format("Device: {}", FormatDeviceGuidName(input.Guid)));
-            buttonInfo.push_back(fmt::format("Button: {}", input.Control));
+            buttonInfo.push_back(fmt::format("{} {}", lang.Tr("buttonsmenu.device"), FormatDeviceGuidName(input.Guid)));
+            buttonInfo.push_back(fmt::format("{} {}", lang.Tr("buttonsmenu.button"), input.Control));
             popTwo = true;
         }
         else {
-            buttonInfo.push_back(fmt::format("{} unassigned", input.Name));
+            buttonInfo.push_back(fmt::format(lang.Tr("buttonsmenu.unassigned"), input.Name));
         }
         if (g_menu.OptionPlus(
-            fmt::format("Assign [{}]", input.Name),
+            fmt::format(lang.Tr("buttonsmenu.assign"), input.Name),
             buttonInfo,
             nullptr,
             [&input] { return clearButton(input.ConfigTag); },
             nullptr,
-            "Current inputs")) {
+            lang.Tr("buttonsmenu.currentinputs"))) {
             bool result = configButton(input.ConfigTag);
             UI::Notify(WARN, result ?
-                fmt::format("[{}] saved", input.Name) :
-                fmt::format("[{}] cancelled", input.Name));
+                fmt::format(lang.Tr("buttonsmenu.saved"), input.Name) :
+                fmt::format(lang.Tr("buttonsmenu.cancelled"), input.Name));
             if (result)
                 initWheel();
         }
@@ -1262,14 +1232,15 @@ void update_buttonsmenu() {
 }
 
 void update_hudmenu() {
-    g_menu.Title("HUD options");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("hudmenu.title"));
     g_menu.Subtitle("");
 
-    g_menu.BoolOption("Enable", g_settings.HUD.Enable,
-        { "Display HUD elements." });
+    g_menu.BoolOption(lang.Tr("hudmenu.enable"), g_settings.HUD.Enable,
+        { lang.Tr("hudmenu.enable.desc") });
 
-    g_menu.BoolOption("Always enable", g_settings.HUD.Always,
-        { "Display HUD even if manual transmission is off." });
+    g_menu.BoolOption(lang.Tr("hudmenu.always"), g_settings.HUD.Always,
+        { lang.Tr("hudmenu.always.desc") });
 
     auto fontIt = std::find_if(fonts.begin(), fonts.end(), [](const SFont& font) { return font.ID == g_settings.HUD.Font; });
     if (fontIt != fonts.end()) {
@@ -1278,61 +1249,63 @@ void update_hudmenu() {
         for (const auto& font : fonts)
             strFonts.push_back(font.Name);
         int fontIndex = static_cast<int>(fontIt - fonts.begin());
-        if (g_menu.StringArray("Font", strFonts, fontIndex, { "Select the font for speed, gearbox mode, current gear." })) {
+        if (g_menu.StringArray(lang.Tr("hudmenu.font"), strFonts, fontIndex, { lang.Tr("hudmenu.font.desc") })) {
             g_settings.HUD.Font = fonts.at(fontIndex).ID;
         }
     }
     else {
-        g_menu.Option("Invalid font ID in settings!", NativeMenu::solidRed, { "Fix the font index in settings_general.ini." });
+        g_menu.Option(lang.Tr("hudmenu.invalidfont"), NativeMenu::solidRed, { lang.Tr("hudmenu.invalidfont.desc") });
     }
 
-    g_menu.BoolOption("Outline text", g_settings.HUD.Outline);
+    g_menu.BoolOption(lang.Tr("hudmenu.outline"), g_settings.HUD.Outline);
 
-    g_menu.StringArray("Notification level", notifyLevelStrings, g_settings.HUD.NotifyLevel,
-        { "What kind of notifications to display.",
+    g_menu.StringArray(lang.Tr("hudmenu.notifylevel"), notifyLevelStrings, g_settings.HUD.NotifyLevel,
+        { lang.Tr("hudmenu.notifylevel.desc"),
         "Debug: All",
         "Info: Mode switching",
         "UI: Menu actions and setup",
         "None: Hide all notifications" });
 
-    g_menu.MenuOption("Gear and shift mode", "geardisplaymenu");
-    g_menu.MenuOption("Speedometer", "speedodisplaymenu");
-    g_menu.MenuOption("RPM gauge", "rpmdisplaymenu");
-    g_menu.MenuOption("Wheel & Pedal info", "wheelinfomenu");
-    g_menu.MenuOption("Dashboard indicators", "dashindicatormenu", 
-        { "Indicator icons for ABS, TCS, ESC and the hand brake." });
-    g_menu.MenuOption("Downshift protection", "dsprotmenu",
-        { "If and where the downshift protection notification should appear." });
-    g_menu.MenuOption("Mouse steering", "mousehudmenu");
+    g_menu.MenuOption(lang.Tr("hudmenu.gear"), "geardisplaymenu");
+    g_menu.MenuOption(lang.Tr("hudmenu.speedo"), "speedodisplaymenu");
+    g_menu.MenuOption(lang.Tr("hudmenu.rpm"), "rpmdisplaymenu");
+    g_menu.MenuOption(lang.Tr("hudmenu.wheelinfo"), "wheelinfomenu");
+    g_menu.MenuOption(lang.Tr("hudmenu.dashindicators"), "dashindicatormenu", 
+        { lang.Tr("hudmenu.dashindicators.desc") });
+    g_menu.MenuOption(lang.Tr("hudmenu.dsprot"), "dsprotmenu",
+        { lang.Tr("hudmenu.dsprot.desc") });
+    g_menu.MenuOption(lang.Tr("hudmenu.mouse"), "mousehudmenu");
 }
 
 void update_geardisplaymenu() {
-    g_menu.Title("Gear options");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("geardisplay.title"));
     g_menu.Subtitle("");
 
-    g_menu.BoolOption("Gear", g_settings.HUD.Gear.Enable);
-    g_menu.BoolOption("Shift Mode", g_settings.HUD.ShiftMode.Enable);
+    g_menu.BoolOption(lang.Tr("geardisplay.gear"), g_settings.HUD.Gear.Enable);
+    g_menu.BoolOption(lang.Tr("geardisplay.shiftmode"), g_settings.HUD.ShiftMode.Enable);
 
-    g_menu.FloatOption("Gear X", g_settings.HUD.Gear.XPos, 0.0f, 1.0f, 0.005f);
-    g_menu.FloatOption("Gear Y", g_settings.HUD.Gear.YPos, 0.0f, 1.0f, 0.005f);
-    g_menu.FloatOption("Gear Size", g_settings.HUD.Gear.Size, 0.0f, 3.0f, 0.05f);
-    g_menu.IntOption("Gear Color Red", g_settings.HUD.Gear.ColorR, 0, 255);
-    g_menu.IntOption("Gear Color Green", g_settings.HUD.Gear.ColorG, 0, 255);
-    g_menu.IntOption("Gear Color Blue", g_settings.HUD.Gear.ColorB, 0, 255);
-    g_menu.IntOption("Gear Top Color Red", g_settings.HUD.Gear.TopColorR, 0, 255);
-    g_menu.IntOption("Gear Top Color Green", g_settings.HUD.Gear.TopColorG, 0, 255);
-    g_menu.IntOption("Gear Top Color Blue", g_settings.HUD.Gear.TopColorB, 0, 255);
+    g_menu.FloatOption(lang.Tr("geardisplay.gearx"), g_settings.HUD.Gear.XPos, 0.0f, 1.0f, 0.005f);
+    g_menu.FloatOption(lang.Tr("geardisplay.geary"), g_settings.HUD.Gear.YPos, 0.0f, 1.0f, 0.005f);
+    g_menu.FloatOption(lang.Tr("geardisplay.gearsize"), g_settings.HUD.Gear.Size, 0.0f, 3.0f, 0.05f);
+    g_menu.IntOption(lang.Tr("geardisplay.gearcolorr"), g_settings.HUD.Gear.ColorR, 0, 255);
+    g_menu.IntOption(lang.Tr("geardisplay.gearcolog"), g_settings.HUD.Gear.ColorG, 0, 255);
+    g_menu.IntOption(lang.Tr("geardisplay.gearcologb"), g_settings.HUD.Gear.ColorB, 0, 255);
+    g_menu.IntOption(lang.Tr("geardisplay.geartopcolorr"), g_settings.HUD.Gear.TopColorR, 0, 255);
+    g_menu.IntOption(lang.Tr("geardisplay.geartopcolorg"), g_settings.HUD.Gear.TopColorG, 0, 255);
+    g_menu.IntOption(lang.Tr("geardisplay.geartopcolorb"), g_settings.HUD.Gear.TopColorB, 0, 255);
 
-    g_menu.FloatOption("Shift Mode X", g_settings.HUD.ShiftMode.XPos, 0.0f, 1.0f, 0.005f);
-    g_menu.FloatOption("Shift Mode Y", g_settings.HUD.ShiftMode.YPos, 0.0f, 1.0f, 0.005f);
-    g_menu.FloatOption("Shift Mode Size", g_settings.HUD.ShiftMode.Size, 0.0f, 3.0f, 0.05f);
-    g_menu.IntOption("Shift Mode Red", g_settings.HUD.ShiftMode.ColorR, 0, 255);
-    g_menu.IntOption("Shift Mode Green", g_settings.HUD.ShiftMode.ColorG, 0, 255);
-    g_menu.IntOption("Shift Mode Blue", g_settings.HUD.ShiftMode.ColorB, 0, 255);
+    g_menu.FloatOption(lang.Tr("geardisplay.shiftmodex"), g_settings.HUD.ShiftMode.XPos, 0.0f, 1.0f, 0.005f);
+    g_menu.FloatOption(lang.Tr("geardisplay.shiftmodey"), g_settings.HUD.ShiftMode.YPos, 0.0f, 1.0f, 0.005f);
+    g_menu.FloatOption(lang.Tr("geardisplay.shiftmodesize"), g_settings.HUD.ShiftMode.Size, 0.0f, 3.0f, 0.05f);
+    g_menu.IntOption(lang.Tr("geardisplay.shiftmoder"), g_settings.HUD.ShiftMode.ColorR, 0, 255);
+    g_menu.IntOption(lang.Tr("geardisplay.shiftmodeg"), g_settings.HUD.ShiftMode.ColorG, 0, 255);
+    g_menu.IntOption(lang.Tr("geardisplay.shiftmodeb"), g_settings.HUD.ShiftMode.ColorB, 0, 255);
 }
 
 void update_speedodisplaymenu() {
-    g_menu.Title("Speedometer options");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("speedodisplay.title"));
     g_menu.Subtitle("");
 
     int oldPos = 0;
@@ -1341,148 +1314,152 @@ void update_speedodisplaymenu() {
         oldPos = static_cast<int>(speedoTypeIt - speedoTypes.begin());
     }
     int newPos = oldPos;
-    g_menu.StringArray("Speedometer", speedoTypes, newPos);
+    g_menu.StringArray(lang.Tr("speedodisplay.speedo"), speedoTypes, newPos);
     if (newPos != oldPos) {
         g_settings.HUD.Speedo.Speedo = speedoTypes.at(newPos);
     }
-    g_menu.BoolOption("Use drivetrain speed", g_settings.HUD.Speedo.UseDrivetrain,
-        { "Uses speed from the driven wheels or dashboard if selected, otherwise uses physics speed." });
-    g_menu.BoolOption("Show units", g_settings.HUD.Speedo.ShowUnit);
+    g_menu.BoolOption(lang.Tr("speedodisplay.drivetrain"), g_settings.HUD.Speedo.UseDrivetrain,
+        { lang.Tr("speedodisplay.drivetrain.desc") });
+    g_menu.BoolOption(lang.Tr("speedodisplay.showunits"), g_settings.HUD.Speedo.ShowUnit);
 
-    g_menu.FloatOption("Speedometer X", g_settings.HUD.Speedo.XPos, 0.0f, 1.0f, 0.005f);
-    g_menu.FloatOption("Speedometer Y", g_settings.HUD.Speedo.YPos, 0.0f, 1.0f, 0.005f);
-    g_menu.FloatOption("Speedometer Size", g_settings.HUD.Speedo.Size, 0.0f, 3.0f, 0.05f);
+    g_menu.FloatOption(lang.Tr("speedodisplay.x"), g_settings.HUD.Speedo.XPos, 0.0f, 1.0f, 0.005f);
+    g_menu.FloatOption(lang.Tr("speedodisplay.y"), g_settings.HUD.Speedo.YPos, 0.0f, 1.0f, 0.005f);
+    g_menu.FloatOption(lang.Tr("speedodisplay.size"), g_settings.HUD.Speedo.Size, 0.0f, 3.0f, 0.05f);
 
-    g_menu.IntOption("Speedometer Color Red", g_settings.HUD.Speedo.ColorR, 0, 255);
-    g_menu.IntOption("Speedometer Color Green", g_settings.HUD.Speedo.ColorG, 0, 255);
-    g_menu.IntOption("Speedometer Color Blue", g_settings.HUD.Speedo.ColorB, 0, 255);
+    g_menu.IntOption(lang.Tr("speedodisplay.colorr"), g_settings.HUD.Speedo.ColorR, 0, 255);
+    g_menu.IntOption(lang.Tr("speedodisplay.colorg"), g_settings.HUD.Speedo.ColorG, 0, 255);
+    g_menu.IntOption(lang.Tr("speedodisplay.colorb"), g_settings.HUD.Speedo.ColorB, 0, 255);
 }
 
 void update_rpmdisplaymenu() {
-    g_menu.Title("RPM Gauge options");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("rpmdisplay.title"));
     g_menu.Subtitle("");
 
-    g_menu.BoolOption("Enable", g_settings.HUD.RPMBar.Enable);
-    g_menu.FloatOption("Redline RPM", g_settings.HUD.RPMBar.Redline, 0.0f, 1.0f, 0.01f);
+    g_menu.BoolOption(lang.Tr("rpmdisplay.enable"), g_settings.HUD.RPMBar.Enable);
+    g_menu.FloatOption(lang.Tr("rpmdisplay.redline"), g_settings.HUD.RPMBar.Redline, 0.0f, 1.0f, 0.01f);
 
-    g_menu.FloatOption("X position", g_settings.HUD.RPMBar.XPos, 0.0f, 1.0f, 0.0025f);
-    g_menu.FloatOption("Y position", g_settings.HUD.RPMBar.YPos, 0.0f, 1.0f, 0.0025f);
-    g_menu.FloatOption("Width", g_settings.HUD.RPMBar.XSz, 0.0f, 1.0f, 0.0025f);
-    g_menu.FloatOption("Height", g_settings.HUD.RPMBar.YSz, 0.0f, 1.0f, 0.0025f);
+    g_menu.FloatOption(lang.Tr("rpmdisplay.xpos"), g_settings.HUD.RPMBar.XPos, 0.0f, 1.0f, 0.0025f);
+    g_menu.FloatOption(lang.Tr("rpmdisplay.ypos"), g_settings.HUD.RPMBar.YPos, 0.0f, 1.0f, 0.0025f);
+    g_menu.FloatOption(lang.Tr("rpmdisplay.width"), g_settings.HUD.RPMBar.XSz, 0.0f, 1.0f, 0.0025f);
+    g_menu.FloatOption(lang.Tr("rpmdisplay.height"), g_settings.HUD.RPMBar.YSz, 0.0f, 1.0f, 0.0025f);
 
-    g_menu.IntOption("Background Red"  , g_settings.HUD.RPMBar.BgR, 0, 255);
-    g_menu.IntOption("Background Green", g_settings.HUD.RPMBar.BgG, 0, 255);
-    g_menu.IntOption("Background Blue" , g_settings.HUD.RPMBar.BgB, 0, 255);
-    g_menu.IntOption("Background Alpha", g_settings.HUD.RPMBar.BgA, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.bgr"), g_settings.HUD.RPMBar.BgR, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.bgg"), g_settings.HUD.RPMBar.BgG, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.bgb"), g_settings.HUD.RPMBar.BgB, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.bga"), g_settings.HUD.RPMBar.BgA, 0, 255);
 
-    g_menu.IntOption("Foreground Red"  , g_settings.HUD.RPMBar.FgR, 0, 255);
-    g_menu.IntOption("Foreground Green", g_settings.HUD.RPMBar.FgG, 0, 255);
-    g_menu.IntOption("Foreground Blue" , g_settings.HUD.RPMBar.FgB, 0, 255);
-    g_menu.IntOption("Foreground Alpha", g_settings.HUD.RPMBar.FgA, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.fgr"), g_settings.HUD.RPMBar.FgR, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.fgg"), g_settings.HUD.RPMBar.FgG, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.fgb"), g_settings.HUD.RPMBar.FgB, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.fga"), g_settings.HUD.RPMBar.FgA, 0, 255);
 
-    g_menu.IntOption("Redline Red"  , g_settings.HUD.RPMBar.RedlineR, 0, 255);
-    g_menu.IntOption("Redline Green", g_settings.HUD.RPMBar.RedlineG, 0, 255);
-    g_menu.IntOption("Redline Blue" , g_settings.HUD.RPMBar.RedlineB, 0, 255);
-    g_menu.IntOption("Redline Alpha", g_settings.HUD.RPMBar.RedlineA, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.redliner"), g_settings.HUD.RPMBar.RedlineR, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.redlineg"), g_settings.HUD.RPMBar.RedlineG, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.redlineb"), g_settings.HUD.RPMBar.RedlineB, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.redlinea"), g_settings.HUD.RPMBar.RedlineA, 0, 255);
 
-    g_menu.IntOption("Revlimit Red"  , g_settings.HUD.RPMBar.RevLimitR, 0, 255);
-    g_menu.IntOption("Revlimit Green", g_settings.HUD.RPMBar.RevLimitG, 0, 255);
-    g_menu.IntOption("Revlimit Blue" , g_settings.HUD.RPMBar.RevLimitB, 0, 255);
-    g_menu.IntOption("Revlimit Alpha", g_settings.HUD.RPMBar.RevLimitA, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.revlimitr"), g_settings.HUD.RPMBar.RevLimitR, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.revlimitg"), g_settings.HUD.RPMBar.RevLimitG, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.revlimitb"), g_settings.HUD.RPMBar.RevLimitB, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.revlimita"), g_settings.HUD.RPMBar.RevLimitA, 0, 255);
 
-    g_menu.IntOption("LaunchControlStaged Red"  , g_settings.HUD.RPMBar.LaunchControlStagedR, 0, 255);
-    g_menu.IntOption("LaunchControlStaged Green", g_settings.HUD.RPMBar.LaunchControlStagedG, 0, 255);
-    g_menu.IntOption("LaunchControlStaged Blue" , g_settings.HUD.RPMBar.LaunchControlStagedB, 0, 255);
-    g_menu.IntOption("LaunchControlStaged Alpha", g_settings.HUD.RPMBar.LaunchControlStagedA, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.lcsr"), g_settings.HUD.RPMBar.LaunchControlStagedR, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.lcsg"), g_settings.HUD.RPMBar.LaunchControlStagedG, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.lcsb"), g_settings.HUD.RPMBar.LaunchControlStagedB, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.lcsa"), g_settings.HUD.RPMBar.LaunchControlStagedA, 0, 255);
 
-    g_menu.IntOption("LaunchControlActive Red"  , g_settings.HUD.RPMBar.LaunchControlActiveR, 0, 255);
-    g_menu.IntOption("LaunchControlActive Green", g_settings.HUD.RPMBar.LaunchControlActiveG, 0, 255);
-    g_menu.IntOption("LaunchControlActive Blue" , g_settings.HUD.RPMBar.LaunchControlActiveB, 0, 255);
-    g_menu.IntOption("LaunchControlActive Alpha", g_settings.HUD.RPMBar.LaunchControlActiveA, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.lcar"), g_settings.HUD.RPMBar.LaunchControlActiveR, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.lcag"), g_settings.HUD.RPMBar.LaunchControlActiveG, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.lcab"), g_settings.HUD.RPMBar.LaunchControlActiveB, 0, 255);
+    g_menu.IntOption(lang.Tr("rpmdisplay.lcaa"), g_settings.HUD.RPMBar.LaunchControlActiveA, 0, 255);
 }
 
 void update_wheelinfomenu() {
-    g_menu.Title("Wheel & pedal info");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("wheelinfo.title"));
     g_menu.Subtitle("");
 
-    g_menu.BoolOption("Display steering wheel info", g_settings.HUD.Wheel.Enable, { "Show input info graphically." });
-    g_menu.BoolOption("Display FFB level", g_settings.HUD.Wheel.FFB.Enable, { "Show a bar with force feedback level." });
-    g_menu.BoolOption("Always display info", g_settings.HUD.Wheel.Always, { "Display the info even without a steering wheel." });
+    g_menu.BoolOption(lang.Tr("wheelinfo.display"), g_settings.HUD.Wheel.Enable, { lang.Tr("wheelinfo.display.desc") });
+    g_menu.BoolOption(lang.Tr("wheelinfo.ffblevel"), g_settings.HUD.Wheel.FFB.Enable, { lang.Tr("wheelinfo.ffblevel.desc") });
+    g_menu.BoolOption(lang.Tr("wheelinfo.always"), g_settings.HUD.Wheel.Always, { lang.Tr("wheelinfo.always.desc") });
 
-    g_menu.FloatOption("Wheel image X", g_settings.HUD.Wheel.ImgXPos, 0.0f, 1.0f, 0.01f);
-    g_menu.FloatOption("Wheel image Y", g_settings.HUD.Wheel.ImgYPos, 0.0f, 1.0f, 0.01f);
-    g_menu.FloatOption("Wheel image size", g_settings.HUD.Wheel.ImgSize, 0.0f, 1.0f, 0.01f);
-    g_menu.FloatOption("Pedals X", g_settings.HUD.Wheel.PedalXPos, 0.0f, 1.0f, 0.01f);
-    g_menu.FloatOption("Pedals Y", g_settings.HUD.Wheel.PedalYPos, 0.0f, 1.0f, 0.01f);
-    g_menu.FloatOption("Pedals Width", g_settings.HUD.Wheel.PedalXSz, 0.0f, 1.0f, 0.01f);
-    g_menu.FloatOption("Pedals Height", g_settings.HUD.Wheel.PedalYSz, 0.0f, 1.0f, 0.01f);
-    g_menu.FloatOption("Pedals Pad X", g_settings.HUD.Wheel.PedalXPad, 0.0f, 1.0f, 0.01f);
-    g_menu.FloatOption("Pedals Pad Y", g_settings.HUD.Wheel.PedalYPad, 0.0f, 1.0f, 0.01f);
-    g_menu.IntOption("Pedals Background Alpha", g_settings.HUD.Wheel.PedalBgA, 0, 255);
-    g_menu.IntOption("Throttle Bar Red    ", g_settings.HUD.Wheel.PedalThrottleR, 0, 255);
-    g_menu.IntOption("Throttle Bar Green  ", g_settings.HUD.Wheel.PedalThrottleG, 0, 255);
-    g_menu.IntOption("Throttle Bar Blue   ", g_settings.HUD.Wheel.PedalThrottleB, 0, 255);
-    g_menu.IntOption("Throttle Bar Alpha  ", g_settings.HUD.Wheel.PedalThrottleA, 0, 255);
-    g_menu.IntOption("Brake Bar Red    ", g_settings.HUD.Wheel.PedalBrakeR, 0, 255);
-    g_menu.IntOption("Brake Bar Green  ", g_settings.HUD.Wheel.PedalBrakeG, 0, 255);
-    g_menu.IntOption("Brake Bar Blue   ", g_settings.HUD.Wheel.PedalBrakeB, 0, 255);
-    g_menu.IntOption("Brake Bar Alpha  ", g_settings.HUD.Wheel.PedalBrakeA   , 0, 255);
-    g_menu.IntOption("Clutch Bar Red    ", g_settings.HUD.Wheel.PedalClutchR, 0, 255);
-    g_menu.IntOption("Clutch Bar Green  ", g_settings.HUD.Wheel.PedalClutchG, 0, 255);
-    g_menu.IntOption("Clutch Bar Blue   ", g_settings.HUD.Wheel.PedalClutchB, 0, 255);
-    g_menu.IntOption("Clutch Bar Alpha  ", g_settings.HUD.Wheel.PedalClutchA  , 0, 255);
+    g_menu.FloatOption(lang.Tr("wheelinfo.imgx"), g_settings.HUD.Wheel.ImgXPos, 0.0f, 1.0f, 0.01f);
+    g_menu.FloatOption(lang.Tr("wheelinfo.imgy"), g_settings.HUD.Wheel.ImgYPos, 0.0f, 1.0f, 0.01f);
+    g_menu.FloatOption(lang.Tr("wheelinfo.imgsize"), g_settings.HUD.Wheel.ImgSize, 0.0f, 1.0f, 0.01f);
+    g_menu.FloatOption(lang.Tr("wheelinfo.pedalx"), g_settings.HUD.Wheel.PedalXPos, 0.0f, 1.0f, 0.01f);
+    g_menu.FloatOption(lang.Tr("wheelinfo.pedaly"), g_settings.HUD.Wheel.PedalYPos, 0.0f, 1.0f, 0.01f);
+    g_menu.FloatOption(lang.Tr("wheelinfo.pedalw"), g_settings.HUD.Wheel.PedalXSz, 0.0f, 1.0f, 0.01f);
+    g_menu.FloatOption(lang.Tr("wheelinfo.pedalh"), g_settings.HUD.Wheel.PedalYSz, 0.0f, 1.0f, 0.01f);
+    g_menu.FloatOption(lang.Tr("wheelinfo.pedalpadx"), g_settings.HUD.Wheel.PedalXPad, 0.0f, 1.0f, 0.01f);
+    g_menu.FloatOption(lang.Tr("wheelinfo.pedalpady"), g_settings.HUD.Wheel.PedalYPad, 0.0f, 1.0f, 0.01f);
+    g_menu.IntOption(lang.Tr("wheelinfo.pedalbga"), g_settings.HUD.Wheel.PedalBgA, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.throttler"), g_settings.HUD.Wheel.PedalThrottleR, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.throttleg"), g_settings.HUD.Wheel.PedalThrottleG, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.throttleb"), g_settings.HUD.Wheel.PedalThrottleB, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.throttlea"), g_settings.HUD.Wheel.PedalThrottleA, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.braker"), g_settings.HUD.Wheel.PedalBrakeR, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.brakg"), g_settings.HUD.Wheel.PedalBrakeG, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.brakeb"), g_settings.HUD.Wheel.PedalBrakeB, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.braka"), g_settings.HUD.Wheel.PedalBrakeA, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.clutchr"), g_settings.HUD.Wheel.PedalClutchR, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.clutchg"), g_settings.HUD.Wheel.PedalClutchG, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.clutchb"), g_settings.HUD.Wheel.PedalClutchB, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.clutcha"), g_settings.HUD.Wheel.PedalClutchA, 0, 255);
 
-    g_menu.FloatOption("FFB Position X", g_settings.HUD.Wheel.FFB.XPos, 0.0f, 1.0f, 0.01f);
-    g_menu.FloatOption("FFB Position Y", g_settings.HUD.Wheel.FFB.YPos, 0.0f, 1.0f, 0.01f);
+    g_menu.FloatOption(lang.Tr("wheelinfo.ffbx"), g_settings.HUD.Wheel.FFB.XPos, 0.0f, 1.0f, 0.01f);
+    g_menu.FloatOption(lang.Tr("wheelinfo.ffby"), g_settings.HUD.Wheel.FFB.YPos, 0.0f, 1.0f, 0.01f);
 
-    g_menu.FloatOption("FFB Width", g_settings.HUD.Wheel.FFB.XSz, 0.0f, 1.0f, 0.01f);
-    g_menu.FloatOption("FFB Height", g_settings.HUD.Wheel.FFB.YSz, 0.0f, 1.0f, 0.01f);
+    g_menu.FloatOption(lang.Tr("wheelinfo.ffbw"), g_settings.HUD.Wheel.FFB.XSz, 0.0f, 1.0f, 0.01f);
+    g_menu.FloatOption(lang.Tr("wheelinfo.ffbh"), g_settings.HUD.Wheel.FFB.YSz, 0.0f, 1.0f, 0.01f);
 
-    g_menu.IntOption("FFB Background Red",   g_settings.HUD.Wheel.FFB.BgR, 0, 255);
-    g_menu.IntOption("FFB Background Green", g_settings.HUD.Wheel.FFB.BgG, 0, 255);
-    g_menu.IntOption("FFB Background Blue",  g_settings.HUD.Wheel.FFB.BgB, 0, 255);
-    g_menu.IntOption("FFB Background Alpha", g_settings.HUD.Wheel.FFB.BgA, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.ffbbgr"), g_settings.HUD.Wheel.FFB.BgR, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.ffbbgg"), g_settings.HUD.Wheel.FFB.BgG, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.ffbbgb"), g_settings.HUD.Wheel.FFB.BgB, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.ffbbga"), g_settings.HUD.Wheel.FFB.BgA, 0, 255);
 
-    g_menu.IntOption("FFB Foreground Red",   g_settings.HUD.Wheel.FFB.FgR, 0, 255);
-    g_menu.IntOption("FFB Foreground Green", g_settings.HUD.Wheel.FFB.FgG, 0, 255);
-    g_menu.IntOption("FFB Foreground Blue",  g_settings.HUD.Wheel.FFB.FgB, 0, 255);
-    g_menu.IntOption("FFB Foreground Alpha", g_settings.HUD.Wheel.FFB.FgA, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.ffbfgr"), g_settings.HUD.Wheel.FFB.FgR, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.ffbfgg"), g_settings.HUD.Wheel.FFB.FgG, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.ffbfgb"), g_settings.HUD.Wheel.FFB.FgB, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.ffbfga"), g_settings.HUD.Wheel.FFB.FgA, 0, 255);
 
-    g_menu.IntOption("FFB Clipping Red",   g_settings.HUD.Wheel.FFB.LimitR, 0, 255);
-    g_menu.IntOption("FFB Clipping Green", g_settings.HUD.Wheel.FFB.LimitG, 0, 255);
-    g_menu.IntOption("FFB Clipping Blue",  g_settings.HUD.Wheel.FFB.LimitB, 0, 255);
-    g_menu.IntOption("FFB Clipping Alpha", g_settings.HUD.Wheel.FFB.LimitA, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.ffblimitr"), g_settings.HUD.Wheel.FFB.LimitR, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.ffblimitg"), g_settings.HUD.Wheel.FFB.LimitG, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.ffblimitb"), g_settings.HUD.Wheel.FFB.LimitB, 0, 255);
+    g_menu.IntOption(lang.Tr("wheelinfo.ffblimita"), g_settings.HUD.Wheel.FFB.LimitA, 0, 255);
 }
 
 void update_dashindicatormenu() {
-    g_menu.Title("Dashboard indicators");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("dashindicator.title"));
     g_menu.Subtitle("");
 
-    g_menu.BoolOption("Enable", g_settings.HUD.DashIndicators.Enable);
-    g_menu.FloatOption("Position X", g_settings.HUD.DashIndicators.XPos, 0.0f, 1.0f, 0.005f);
-    g_menu.FloatOption("Position Y", g_settings.HUD.DashIndicators.YPos, 0.0f, 1.0f, 0.005f);
-    g_menu.FloatOption("Size", g_settings.HUD.DashIndicators.Size, 0.25f, 4.0f, 0.05f);
+    g_menu.BoolOption(lang.Tr("dashindicator.enable"), g_settings.HUD.DashIndicators.Enable);
+    g_menu.FloatOption(lang.Tr("dashindicator.posx"), g_settings.HUD.DashIndicators.XPos, 0.0f, 1.0f, 0.005f);
+    g_menu.FloatOption(lang.Tr("dashindicator.posy"), g_settings.HUD.DashIndicators.YPos, 0.0f, 1.0f, 0.005f);
+    g_menu.FloatOption(lang.Tr("dashindicator.size"), g_settings.HUD.DashIndicators.Size, 0.25f, 4.0f, 0.05f);
 
-    g_menu.BoolOption("Lite", g_settings.HUD.DashIndicators.Lite,
-        { "Use text instead of PNG images.",
-          "Also applies for downshift protection notification." });
+    g_menu.BoolOption(lang.Tr("dashindicator.lite"), g_settings.HUD.DashIndicators.Lite,
+        { lang.Tr("dashindicator.lite.desc1"),
+          lang.Tr("dashindicator.lite.desc2") });
     if (g_settings.HUD.DashIndicators.Lite) {
-        g_menu.FloatOptionCb("Vertical offset", g_settings.HUD.DashIndicators.TxtVOffset,
+        g_menu.FloatOptionCb(lang.Tr("dashindicator.vertoffset"), g_settings.HUD.DashIndicators.TxtVOffset,
             -1.0f, 1.0f, 0.005f, GetKbEntryFloat,
-            { "Different fonts have different vertical alignments.",
-              "Use this option to vertically center the text in the box.",
-              "(Manual input is possible)" });
+            { lang.Tr("dashindicator.vertoffset.desc1"),
+              lang.Tr("dashindicator.vertoffset.desc2"),
+              lang.Tr("dashindicator.vertoffset.desc3") });
 
-        g_menu.FloatOptionCb("Size multiplier", g_settings.HUD.DashIndicators.TxtSzMod,
+        g_menu.FloatOptionCb(lang.Tr("dashindicator.sizemult"), g_settings.HUD.DashIndicators.TxtSzMod,
             0.0f, 10.0f, 0.05f, GetKbEntryFloat,
-            { "Different fonts are bigger/smaller.",
-              "Use this option to compensate Rockstar Games' consistent inconsistency.",
-              "(Manual input is possible)" });
+            { lang.Tr("dashindicator.sizemult.desc1"),
+              lang.Tr("dashindicator.sizemult.desc2"),
+              lang.Tr("dashindicator.sizemult.desc3") });
     }
 }
 
 void update_dsprotmenu() {
-    g_menu.Title("Downshift protection");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("dsprot.title"));
     g_menu.Subtitle("");
 
     extern int g_textureDsProtId;
@@ -1492,198 +1469,204 @@ void update_dsprotmenu() {
         g_settings.HUD.DsProt.XPos, g_settings.HUD.DsProt.YPos,
         0.0f, GRAPHICS::GET_ASPECT_RATIO(FALSE), 1.0f, 1.0f, 1.0f, 1.0f);
 
-    g_menu.BoolOption("Enable", g_settings.HUD.DsProt.Enable,
-        { "When enabled, a warning flashes and a warning sound plays." });
+    g_menu.BoolOption(lang.Tr("dsprot.enable"), g_settings.HUD.DsProt.Enable,
+        { lang.Tr("dsprot.enable.desc") });
 
-    g_menu.FloatOption("Position X", g_settings.HUD.DsProt.XPos, 0.0f, 1.0f, 0.005f);
-    g_menu.FloatOption("Position Y", g_settings.HUD.DsProt.YPos, 0.0f, 1.0f, 0.005f);
-    g_menu.FloatOption("Size", g_settings.HUD.DsProt.Size, 0.01f, 1.0f, 0.01f);
+    g_menu.FloatOption(lang.Tr("dsprot.posx"), g_settings.HUD.DsProt.XPos, 0.0f, 1.0f, 0.005f);
+    g_menu.FloatOption(lang.Tr("dsprot.posy"), g_settings.HUD.DsProt.YPos, 0.0f, 1.0f, 0.005f);
+    g_menu.FloatOption(lang.Tr("dsprot.size"), g_settings.HUD.DsProt.Size, 0.01f, 1.0f, 0.01f);
 }
 
 void update_mousehudmenu() {
-    g_menu.Title("Mouse steering HUD options");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("mousehud.title"));
     g_menu.Subtitle("");
 
-    g_menu.BoolOption("Enable", g_settings.HUD.MouseSteering.Enable);
+    g_menu.BoolOption(lang.Tr("mousehud.enable"), g_settings.HUD.MouseSteering.Enable);
 
-    g_menu.FloatOption("Pos X", g_settings.HUD.MouseSteering.XPos, 0.0f, 1.0f, 0.0025f);
-    g_menu.FloatOption("Pos Y", g_settings.HUD.MouseSteering.YPos, 0.0f, 1.0f, 0.0025f);
-    g_menu.FloatOption("Width", g_settings.HUD.MouseSteering.XSz, 0.0f, 1.0f, 0.0025f);
-    g_menu.FloatOption("Height", g_settings.HUD.MouseSteering.YSz, 0.0f, 1.0f, 0.0025f);
-    g_menu.FloatOption("Marker width", g_settings.HUD.MouseSteering.MarkerXSz, 0.0f, 1.0f, 0.0025f);
+    g_menu.FloatOption(lang.Tr("mousehud.posx"), g_settings.HUD.MouseSteering.XPos, 0.0f, 1.0f, 0.0025f);
+    g_menu.FloatOption(lang.Tr("mousehud.posy"), g_settings.HUD.MouseSteering.YPos, 0.0f, 1.0f, 0.0025f);
+    g_menu.FloatOption(lang.Tr("mousehud.width"), g_settings.HUD.MouseSteering.XSz, 0.0f, 1.0f, 0.0025f);
+    g_menu.FloatOption(lang.Tr("mousehud.height"), g_settings.HUD.MouseSteering.YSz, 0.0f, 1.0f, 0.0025f);
+    g_menu.FloatOption(lang.Tr("mousehud.markerw"), g_settings.HUD.MouseSteering.MarkerXSz, 0.0f, 1.0f, 0.0025f);
 
-    g_menu.IntOption("Background Red  ", g_settings.HUD.MouseSteering.BgR, 0, 255);
-    g_menu.IntOption("Background Green", g_settings.HUD.MouseSteering.BgG, 0, 255);
-    g_menu.IntOption("Background Blue ", g_settings.HUD.MouseSteering.BgB, 0, 255);
-    g_menu.IntOption("Background Alpha", g_settings.HUD.MouseSteering.BgA, 0, 255);
+    g_menu.IntOption(lang.Tr("mousehud.bgr"), g_settings.HUD.MouseSteering.BgR, 0, 255);
+    g_menu.IntOption(lang.Tr("mousehud.bgg"), g_settings.HUD.MouseSteering.BgG, 0, 255);
+    g_menu.IntOption(lang.Tr("mousehud.bgb"), g_settings.HUD.MouseSteering.BgB, 0, 255);
+    g_menu.IntOption(lang.Tr("mousehud.bga"), g_settings.HUD.MouseSteering.BgA, 0, 255);
 
-    g_menu.IntOption("Foreground Red  ", g_settings.HUD.MouseSteering.FgR, 0, 255);
-    g_menu.IntOption("Foreground Green", g_settings.HUD.MouseSteering.FgG, 0, 255);
-    g_menu.IntOption("Foreground Blue ", g_settings.HUD.MouseSteering.FgB, 0, 255);
-    g_menu.IntOption("Foreground Alpha", g_settings.HUD.MouseSteering.FgA, 0, 255);
+    g_menu.IntOption(lang.Tr("mousehud.fgr"), g_settings.HUD.MouseSteering.FgR, 0, 255);
+    g_menu.IntOption(lang.Tr("mousehud.fgg"), g_settings.HUD.MouseSteering.FgG, 0, 255);
+    g_menu.IntOption(lang.Tr("mousehud.fgb"), g_settings.HUD.MouseSteering.FgB, 0, 255);
+    g_menu.IntOption(lang.Tr("mousehud.fga"), g_settings.HUD.MouseSteering.FgA, 0, 255);
 }
 
 void update_driveassistmenu() {
-    g_menu.Title("Driving assists");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("driveassist.title"));
     g_menu.Subtitle(MenuSubtitleConfig());
 
-    g_menu.BoolOption("Anti-lock Braking", g_settings().DriveAssists.ABS.Enable,
-        { "Custom script-driven anti-lock braking system (ABS).",
-          "Prevent wheels from locking up during braking." });
+    g_menu.BoolOption(lang.Tr("driveassist.abs"), g_settings().DriveAssists.ABS.Enable,
+        { lang.Tr("driveassist.abs.desc1"),
+          lang.Tr("driveassist.abs.desc2") });
 
-    g_menu.MenuOption("ABS settings", "abssettingsmenu",
-        { "Change how the anti-lock braking system works." });
+    g_menu.MenuOption(lang.Tr("driveassist.abssettings"), "abssettingsmenu",
+        { lang.Tr("driveassist.abssettings.desc") });
 
-    g_menu.BoolOption("Traction Control", g_settings().DriveAssists.TCS.Enable,
-        { "Script-driven traction control system (TCS).",
-          "Prevent traction loss under acceleration." });
+    g_menu.BoolOption(lang.Tr("driveassist.tcs"), g_settings().DriveAssists.TCS.Enable,
+        { lang.Tr("driveassist.tcs.desc1"),
+          lang.Tr("driveassist.tcs.desc2") });
 
-    g_menu.MenuOption("TCS settings", "tcssettingsmenu",
-        { "Change how and when the traction control system works." });
+    g_menu.MenuOption(lang.Tr("driveassist.tcssettings"), "tcssettingsmenu",
+        { lang.Tr("driveassist.tcssettings.desc") });
 
-    g_menu.BoolOption("Stability Control", g_settings().DriveAssists.ESP.Enable,
-        { "Script-driven stability control system (ESC).",
-          "Prevent excessive over- and understeer." });
+    g_menu.BoolOption(lang.Tr("driveassist.esp"), g_settings().DriveAssists.ESP.Enable,
+        { lang.Tr("driveassist.esp.desc1"),
+          lang.Tr("driveassist.esp.desc2") });
 
-    g_menu.MenuOption("ESC settings", "espsettingsmenu", 
-        { "Change the behaviour and tolerances of the stability control system." });
+    g_menu.MenuOption(lang.Tr("driveassist.espsettings"), "espsettingsmenu", 
+        { lang.Tr("driveassist.espsettings.desc") });
 
-    g_menu.BoolOption("Launch Control", g_settings().DriveAssists.LaunchControl.Enable,
-        { "Keeps a stable RPM and manages throttle in first gear, for maximum launch performance." });
+    g_menu.BoolOption(lang.Tr("driveassist.lc"), g_settings().DriveAssists.LaunchControl.Enable,
+        { lang.Tr("driveassist.lc.desc") });
 
-    g_menu.MenuOption("Launch Control settings", "lcssettings",
-        { "Change how and when the launch control works." });
+    g_menu.MenuOption(lang.Tr("driveassist.lcsettings"), "lcssettings",
+        { lang.Tr("driveassist.lcsettings.desc") });
 
-    g_menu.BoolOption("Limited Slip Differential", g_settings().DriveAssists.LSD.Enable,
-        { "Simulate a viscous limited slip differential (LSD).",
-          "Thanks to any333!"});
+    g_menu.BoolOption(lang.Tr("driveassist.lsd"), g_settings().DriveAssists.LSD.Enable,
+        { lang.Tr("driveassist.lsd.desc1"),
+          lang.Tr("driveassist.lsd.desc2")});
 
-    g_menu.MenuOption("LSD settings", "lsdsettingsmenu",
-        { "Change how the limited slip differential works." });
+    g_menu.MenuOption(lang.Tr("driveassist.lsdsettings"), "lsdsettingsmenu",
+        { lang.Tr("driveassist.lsdsettings.desc") });
 
-    g_menu.BoolOption("Adaptive AWD", g_settings().DriveAssists.AWD.Enable,
-        { "Transfers torque to stabilize the car. See Nissans' ATTESA, Audis' Quattro, etc.",
-          "Only works on AWD cars. Recommended to use only in vehicle-specific configurations!"});
+    g_menu.BoolOption(lang.Tr("driveassist.awd"), g_settings().DriveAssists.AWD.Enable,
+        { lang.Tr("driveassist.awd.desc1"),
+          lang.Tr("driveassist.awd.desc2")});
 
-    g_menu.MenuOption("Adaptive AWD settings", "awdsettingsmenu");
+    g_menu.MenuOption(lang.Tr("driveassist.awdsettings"), "awdsettingsmenu");
 
-    g_menu.BoolOption("Cruise Control", g_settings().DriveAssists.CruiseControl.Enable);
+    g_menu.BoolOption(lang.Tr("driveassist.cc"), g_settings().DriveAssists.CruiseControl.Enable);
 
-    g_menu.MenuOption("Cruise Control settings", "cruisecontrolsettingsmenu");
+    g_menu.MenuOption(lang.Tr("driveassist.ccsettings"), "cruisecontrolsettingsmenu");
 }
 
 void update_abssettingsmenu() {
-    g_menu.Title("Anti-lock Braking");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("abssettings.title"));
     g_menu.Subtitle(MenuSubtitleConfig());
 
-    g_menu.BoolOption("Only enable ABS when missing", g_settings().DriveAssists.ABS.Filter,
-        { "Only enables custom ABS on cars without ABS.",
-          "Keep this enabled unless you know what you're doing." });
+    g_menu.BoolOption(lang.Tr("abssettings.filter"), g_settings().DriveAssists.ABS.Filter,
+        { lang.Tr("abssettings.filter.desc1"),
+          lang.Tr("abssettings.filter.desc2") });
 
-    g_menu.BoolOption("Flash brake lights", g_settings().DriveAssists.ABS.Flash,
-        { "Flash brakes light when ABS is active." });
+    g_menu.BoolOption(lang.Tr("abssettings.flash"), g_settings().DriveAssists.ABS.Flash,
+        { lang.Tr("abssettings.flash.desc") });
 
 }
 
 void update_tcssettingsmenu() {
-    g_menu.Title("Traction Control");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("tcssettings.title"));
     g_menu.Subtitle(MenuSubtitleConfig());
 
-    g_menu.StringArray("Traction control mode", tcsStrings, g_settings().DriveAssists.TCS.Mode,
-        { "Different methods to stop wheels from losing traction.",
-          "Brakes: Applies brakes for slipping wheels.",
-          "Throttle: Reduce throttle when any slip is detected." });
+    g_menu.StringArray(lang.Tr("tcssettings.mode"), tcsStrings, g_settings().DriveAssists.TCS.Mode,
+        { lang.Tr("tcssettings.mode.desc1"),
+          lang.Tr("tcssettings.mode.desc2"),
+          lang.Tr("tcssettings.mode.desc3") });
 
-    g_menu.FloatOption("Minimum slip", g_settings().DriveAssists.TCS.SlipMin, 1.0f, 20.0f, 0.05f,
-        { "Wheel speed relative to actual speed, where traction control starts to intervene.",
-          "Recommended value: 1.20x.",
-          "Should be higher than 1.00x." });
+    g_menu.FloatOption(lang.Tr("tcssettings.slipmin"), g_settings().DriveAssists.TCS.SlipMin, 1.0f, 20.0f, 0.05f,
+        { lang.Tr("tcssettings.slipmin.desc1"),
+          lang.Tr("tcssettings.slipmin.desc2"),
+          lang.Tr("tcssettings.slipmin.desc3") });
 
     float min = g_settings().DriveAssists.TCS.SlipMin;
-    g_menu.FloatOption("Maximum slip", g_settings().DriveAssists.TCS.SlipMax, min, 20.0f, 0.05f,
-        { "Wheel speed relative to actual speed, where traction control intervention is maximum.",
-          "Recommended value: 1.40x.",
-          "Has to be higher than 'Minimum slip'." });
+    g_menu.FloatOption(lang.Tr("tcssettings.slipmax"), g_settings().DriveAssists.TCS.SlipMax, min, 20.0f, 0.05f,
+        { lang.Tr("tcssettings.slipmax.desc1"),
+          lang.Tr("tcssettings.slipmax.desc2"),
+          lang.Tr("tcssettings.slipmax.desc3") });
 
-    g_menu.FloatOptionCb("Brake multiplier", g_settings().DriveAssists.TCS.BrakeMult, 0.0f, 10.0f, 0.05f, GetKbEntryFloat,
-        { "How much traction control may brake a wheel at most.",
-          "Only applies for Brake-mode traction control.",
-          "0.5:  50% braking force applied.",
-          "1.0: 100% braking force applied.",
-          "2.0: 200% braking force applied." });
+    g_menu.FloatOptionCb(lang.Tr("tcssettings.brakemult"), g_settings().DriveAssists.TCS.BrakeMult, 0.0f, 10.0f, 0.05f, GetKbEntryFloat,
+        { lang.Tr("tcssettings.brakemult.desc1"),
+          lang.Tr("tcssettings.brakemult.desc2"),
+          lang.Tr("tcssettings.brakemult.desc3"),
+          lang.Tr("tcssettings.brakemult.desc4"),
+          lang.Tr("tcssettings.brakemult.desc5") });
 }
 
 void update_espsettingsmenu() {
-    g_menu.Title("Stability Control");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("espsettings.title"));
     g_menu.Subtitle(MenuSubtitleConfig());
 
-    g_menu.FloatOption("Oversteer starting angle", g_settings().DriveAssists.ESP.OverMin, 0.0f, 90.0f, 0.1f,
-        { "Angle (degrees) where ESC starts correcting for oversteer." });
-    g_menu.FloatOption("Oversteer starting correction", g_settings().DriveAssists.ESP.OverMinComp, 0.0f, 10.0f, 0.1f,
-        { "Starting ESC oversteer correction value. Additional braking force for the affected wheel." });
-    g_menu.FloatOption("Oversteer max angle", g_settings().DriveAssists.ESP.OverMax, 0.0f, 90.0f, 0.1f,
-        { "Angle (degrees) where ESC oversteer correction is maximized." });
-    g_menu.FloatOption("Oversteer max correction", g_settings().DriveAssists.ESP.OverMaxComp, 0.0f, 10.0f, 0.1f,
-        { "Max ESC oversteer correction value. Additional braking force for the affected wheel." });
+    g_menu.FloatOption(lang.Tr("espsettings.overmin"), g_settings().DriveAssists.ESP.OverMin, 0.0f, 90.0f, 0.1f,
+        { lang.Tr("espsettings.overmin.desc") });
+    g_menu.FloatOption(lang.Tr("espsettings.overmincomp"), g_settings().DriveAssists.ESP.OverMinComp, 0.0f, 10.0f, 0.1f,
+        { lang.Tr("espsettings.overmincomp.desc") });
+    g_menu.FloatOption(lang.Tr("espsettings.overmax"), g_settings().DriveAssists.ESP.OverMax, 0.0f, 90.0f, 0.1f,
+        { lang.Tr("espsettings.overmax.desc") });
+    g_menu.FloatOption(lang.Tr("espsettings.overmaxcomp"), g_settings().DriveAssists.ESP.OverMaxComp, 0.0f, 10.0f, 0.1f,
+        { lang.Tr("espsettings.overmaxcomp.desc") });
 
-    g_menu.FloatOption("Understeer starting angle", g_settings().DriveAssists.ESP.UnderMin, 0.0f, 90.0f, 0.1f,
-        { "Angle (degrees) where ESC starts correcting for understeer." });
-    g_menu.FloatOption("Understeer starting correction", g_settings().DriveAssists.ESP.UnderMinComp, 0.0f, 10.0f, 0.1f,
-        { "Starting ESC understeer correction value. Additional braking force for the affected wheel." });
-    g_menu.FloatOption("Understeer max angle", g_settings().DriveAssists.ESP.UnderMax, 0.0f, 90.0f, 0.1f,
-        { "Angle (degrees) where ESC understeer correction is maximized." });
-    g_menu.FloatOption("Understeer max correction", g_settings().DriveAssists.ESP.UnderMaxComp, 0.0f, 10.0f, 0.1f,
-        { "Max ESC oversteer understeer value. Additional braking force for the affected wheel." });
+    g_menu.FloatOption(lang.Tr("espsettings.undermin"), g_settings().DriveAssists.ESP.UnderMin, 0.0f, 90.0f, 0.1f,
+        { lang.Tr("espsettings.undermin.desc") });
+    g_menu.FloatOption(lang.Tr("espsettings.undermincomp"), g_settings().DriveAssists.ESP.UnderMinComp, 0.0f, 10.0f, 0.1f,
+        { lang.Tr("espsettings.undermincomp.desc") });
+    g_menu.FloatOption(lang.Tr("espsettings.undermax"), g_settings().DriveAssists.ESP.UnderMax, 0.0f, 90.0f, 0.1f,
+        { lang.Tr("espsettings.undermax.desc") });
+    g_menu.FloatOption(lang.Tr("espsettings.undermaxcomp"), g_settings().DriveAssists.ESP.UnderMaxComp, 0.0f, 10.0f, 0.1f,
+        { lang.Tr("espsettings.undermaxcomp.desc") });
 }
 
 void update_lcssettingsmenu() {
-    g_menu.Title("Launch Control");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("lcssettings.title"));
     g_menu.Subtitle(MenuSubtitleConfig());
 
-    g_menu.FloatOption("Launch control RPM", g_settings().DriveAssists.LaunchControl.RPM, 0.3f, 0.9f, 0.025f,
-        { "When staged, hold this RPM." });
+    g_menu.FloatOption(lang.Tr("lcssettings.rpm"), g_settings().DriveAssists.LaunchControl.RPM, 0.3f, 0.9f, 0.025f,
+        { lang.Tr("lcssettings.rpm.desc") });
 
-    g_menu.FloatOption("Minimum slip", g_settings().DriveAssists.LaunchControl.SlipMin, 0.0f, 20.0f, 0.1f,
-        { "Wheel speed relative to actual speed, where launch control starts to intervene (reduce throttle).",
-          "Recommended value: 1.20x.",
-          "Should be higher than 1.00x." });
+    g_menu.FloatOption(lang.Tr("lcssettings.slipmin"), g_settings().DriveAssists.LaunchControl.SlipMin, 0.0f, 20.0f, 0.1f,
+        { lang.Tr("lcssettings.slipmin.desc1"),
+          lang.Tr("lcssettings.slipmin.desc2"),
+          lang.Tr("lcssettings.slipmin.desc3") });
 
     float min = g_settings().DriveAssists.LaunchControl.SlipMin;
-    g_menu.FloatOption("Maximum slip", g_settings().DriveAssists.LaunchControl.SlipMax, min, 20.0f, 0.1f,
-        { "Wheel speed relative to actual speed, where launch control intervention is maximum (zero throttle).",
-          "Recommended value: 1.40x.",
-          "Has to be higher than 'Minimum slip'." });
+    g_menu.FloatOption(lang.Tr("lcssettings.slipmax"), g_settings().DriveAssists.LaunchControl.SlipMax, min, 20.0f, 0.1f,
+        { lang.Tr("lcssettings.slipmax.desc1"),
+          lang.Tr("lcssettings.slipmax.desc2"),
+          lang.Tr("lcssettings.slipmax.desc3") });
 
     const std::vector<std::string> instructions{
-        "Staging for launch control:",
-        "1: Stop car, select 1st gear",
-        "2: Hold brakes",
-        "3: Apply throttle",
-        "4: Release brake to launch!",
-        "While staged, clutch can be released. Launch control manages the clutch.",
+        lang.Tr("lcssettings.instructions.title"),
+        lang.Tr("lcssettings.instructions.step1"),
+        lang.Tr("lcssettings.instructions.step2"),
+        lang.Tr("lcssettings.instructions.step3"),
+        lang.Tr("lcssettings.instructions.step4"),
+        lang.Tr("lcssettings.instructions.note"),
     };
 
-    g_menu.OptionPlus("Instructions", instructions);
+    g_menu.OptionPlus(lang.Tr("lcssettings.instructions"), instructions);
 }
 
 void update_lsdsettingsmenu() {
-    g_menu.Title("Limited Slip Differential");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("lsdsettings.title"));
     g_menu.Subtitle(MenuSubtitleConfig());
 
-    g_menu.FloatOption("LSD viscosity", g_settings().DriveAssists.LSD.Viscosity, 0.0f, 100.0f, 1.0f,
-        { "How much the slower wheel tries to match the faster wheel.",
-          "A very high value might speed up the car too much, because this LSD adds power to the slower wheel. "
-          "About 10 is decent and doesn't affect acceleration." });
+    g_menu.FloatOption(lang.Tr("lsdsettings.viscosity"), g_settings().DriveAssists.LSD.Viscosity, 0.0f, 100.0f, 1.0f,
+        { lang.Tr("lsdsettings.viscosity.desc1"),
+          lang.Tr("lsdsettings.viscosity.desc2") });
 
     bool statusSelected = false;
-    g_menu.OptionPlus("Status", {}, &statusSelected, nullptr, nullptr, "Status", 
-        { "Live LSD status" });
+    g_menu.OptionPlus(lang.Tr("lsdsettings.status"), {}, &statusSelected, nullptr, nullptr, lang.Tr("lsdsettings.status"), 
+        { lang.Tr("lsdsettings.status.desc") });
 
     if (statusSelected) {
         std::vector<std::string> extra;
 
         if (!g_settings().DriveAssists.LSD.Enable) {
-            extra.push_back("LSD Disabled");
+            extra.push_back(lang.Tr("lsdsettings.disabled"));
         }
         else {
             auto lsdData = DrivingAssists::GetLSD();
@@ -1702,20 +1685,21 @@ void update_lsdsettingsmenu() {
             extra.push_back(fmt::format("LR/RR [{:.2f}]/[{:.2f}]", lsdData.BrakeLR, lsdData.BrakeRR));
             extra.push_back(fmt::format("{}LSD: {}",
                 lsdData.Use ? "~g~" : "~r~",
-                lsdData.Use ? "Active" : "Idle/Off"));
+                lsdData.Use ? lang.Tr("lsdstatus.active") : lang.Tr("lsdstatus.idle")));
         }
 
-        g_menu.OptionPlusPlus(extra, "Status");
+        g_menu.OptionPlusPlus(extra, lang.Tr("lsdsettings.status"));
     }
 }
 
 void update_awdsettingsmenu() {
-    g_menu.Title("Adaptive AWD");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("awdsettings.title"));
     g_menu.Subtitle(MenuSubtitleConfig());
 
     if (!HandlingReplacement::Available()) {
-        if (g_menu.Option("HandlingReplacement.asi missing",
-            { "Adaptive AWD needs HandlingReplacement. Press Select to go to the download page." })) {
+        if (g_menu.Option(lang.Tr("awdsettings.handlingmissing"),
+            { lang.Tr("awdsettings.handlingmissing.desc") })) {
             WAIT(20);
             PAD::SET_CONTROL_VALUE_NEXT_FRAME(0, ControlFrontendPause, 1.0f);
             ShellExecuteA(0, 0, "https://www.gta5-mods.com/tools/handling-replacement-library", 0, 0, SW_SHOW);
@@ -1723,7 +1707,7 @@ void update_awdsettingsmenu() {
     }
 
     bool resolveAWD = false;
-    g_menu.OptionPlus("AWD Status", {}, &resolveAWD, nullptr, nullptr, "", { "Real-time AWD overview status" });
+    g_menu.OptionPlus(lang.Tr("awdsettings.status"), {}, &resolveAWD, nullptr, nullptr, "", { lang.Tr("awdsettings.status.desc") });
     if (resolveAWD) {
         std::vector<std::string> awdStats;
         extern Vehicle g_playerVehicle;
@@ -1731,45 +1715,45 @@ void update_awdsettingsmenu() {
             awdStats = GetAWDInfo(g_playerVehicle);
         }
         else {
-            awdStats = { "No current vehicle" };
+            awdStats = { lang.Tr("awdsettings.novehicle") };
         }
-        g_menu.OptionPlusPlus(awdStats, "Status");
+        g_menu.OptionPlusPlus(awdStats, lang.Tr("awdsettings.status"));
     }
 
-    g_menu.BoolOption("Use custom drive bias", g_settings().DriveAssists.AWD.UseCustomBaseBias, 
-        { "Override the front drive bias." });
-    g_menu.FloatOption("Custom front drive bias", g_settings().DriveAssists.AWD.CustomBaseBias, 0.01f, 0.99f, 0.01f,
-        { "Value is front bias based: 0.01 is 1% front, 99% rear. 0.99 is 99% front, 1% rear.",
-          "Useful to set 1% to 9% and 91% to 99% drive biases, as GTA snaps to full FWD at more than 0.9 fDriveBiasFront and full RWD on less than 0.1 fDriveBiasFront." });
+    g_menu.BoolOption(lang.Tr("awdsettings.usecustombias"), g_settings().DriveAssists.AWD.UseCustomBaseBias, 
+        { lang.Tr("awdsettings.usecustombias.desc") });
+    g_menu.FloatOption(lang.Tr("awdsettings.custombias"), g_settings().DriveAssists.AWD.CustomBaseBias, 0.01f, 0.99f, 0.01f,
+        { lang.Tr("awdsettings.custombias.desc1"),
+          lang.Tr("awdsettings.custombias.desc2") });
 
-    g_menu.FloatOption("Custom bias min", g_settings().DriveAssists.AWD.CustomMin, 0.01f, 0.99f, 0.01f,
-        { "Lowest value custom bias can be when manually adjusting drive bias." });
-    g_menu.FloatOption("Custom bias max", g_settings().DriveAssists.AWD.CustomMax, 0.01f, 0.99f, 0.01f,
-        { "Highest value custom bias can be when manually adjusting drive bias." });
+    g_menu.FloatOption(lang.Tr("awdsettings.custommin"), g_settings().DriveAssists.AWD.CustomMin, 0.01f, 0.99f, 0.01f,
+        { lang.Tr("awdsettings.custommin.desc") });
+    g_menu.FloatOption(lang.Tr("awdsettings.custommax"), g_settings().DriveAssists.AWD.CustomMax, 0.01f, 0.99f, 0.01f,
+        { lang.Tr("awdsettings.custommax.desc") });
 
-    g_menu.FloatOption("Drive bias @ max transfer", g_settings().DriveAssists.AWD.BiasAtMaxTransfer, 0.01f, 0.99f, 0.01f,
-        { "Value is front bias based: 0.01 is 1% front, 99% rear. 0.99 is 99% front, 1% rear.",
-          "Example: if your usual Drive bias is 0.1 (so 90/10), and traction-loss transfer is enabled, a value here of 0.9 will send 90% of the torque to the front." });
+    g_menu.FloatOption(lang.Tr("awdsettings.biasmaxtransfer"), g_settings().DriveAssists.AWD.BiasAtMaxTransfer, 0.01f, 0.99f, 0.01f,
+        { lang.Tr("awdsettings.biasmaxtransfer.desc1"),
+          lang.Tr("awdsettings.biasmaxtransfer.desc2") });
 
-    g_menu.BoolOption("On traction loss", g_settings().DriveAssists.AWD.UseTraction, 
-        { "Transfer drive bias to the weaker wheels when the strong wheels break traction." } );
+    g_menu.BoolOption(lang.Tr("awdsettings.ontraction"), g_settings().DriveAssists.AWD.UseTraction, 
+        { lang.Tr("awdsettings.ontraction.desc") } );
 
-    g_menu.FloatOption("Speed min difference", g_settings().DriveAssists.AWD.TractionLossMin, 1.0f, 2.0f, 0.05f,
-        { "Speed difference for the transfer to kick in.", "1.05 is 5% faster, 1.50 is 50% faster, etc." });
-    g_menu.FloatOption("Speed max difference", g_settings().DriveAssists.AWD.TractionLossMax, 1.0f, 2.0f, 0.05f,
-        { "Speed difference for max transfer.", "1.05 is 5% faster, 1.50 is 50% faster, etc." });
+    g_menu.FloatOption(lang.Tr("awdsettings.speedmindiff"), g_settings().DriveAssists.AWD.TractionLossMin, 1.0f, 2.0f, 0.05f,
+        { lang.Tr("awdsettings.speedmindiff.desc") });
+    g_menu.FloatOption(lang.Tr("awdsettings.speedmaxdiff"), g_settings().DriveAssists.AWD.TractionLossMax, 1.0f, 2.0f, 0.05f,
+        { lang.Tr("awdsettings.speedmaxdiff.desc") });
 
     // Should only be used for RWD-biased cars
-    g_menu.BoolOption("On oversteer", g_settings().DriveAssists.AWD.UseOversteer,
-        { "Transfer drive bias when oversteer is detected. Mostly useful for RWD-biased cars." });
-    g_menu.FloatOption("Oversteer min", g_settings().DriveAssists.AWD.OversteerMin, 0.0f, 90.0f, 1.0f); // degrees
-    g_menu.FloatOption("Oversteer max", g_settings().DriveAssists.AWD.OversteerMax, 0.0f, 90.0f, 1.0f); // degrees
+    g_menu.BoolOption(lang.Tr("awdsettings.onoversteer"), g_settings().DriveAssists.AWD.UseOversteer,
+        { lang.Tr("awdsettings.onoversteer.desc") });
+    g_menu.FloatOption(lang.Tr("awdsettings.onoversteer") + " min", g_settings().DriveAssists.AWD.OversteerMin, 0.0f, 90.0f, 1.0f); // degrees
+    g_menu.FloatOption(lang.Tr("awdsettings.onoversteer") + " max", g_settings().DriveAssists.AWD.OversteerMax, 0.0f, 90.0f, 1.0f); // degrees
     
     // Should only be used for FWD-biased cars
-    g_menu.BoolOption("On understeer", g_settings().DriveAssists.AWD.UseUndersteer,
-        { "Transfer drive bias when understeer is detected. Mostly useful for FWD-biased cars." });
-    g_menu.FloatOption("Understeer min", g_settings().DriveAssists.AWD.UndersteerMin, 0.0f, 90.0f, 1.0f); // degrees
-    g_menu.FloatOption("Understeer max", g_settings().DriveAssists.AWD.UndersteerMax, 0.0f, 90.0f, 1.0f); // degrees
+    g_menu.BoolOption(lang.Tr("awdsettings.onundersteer"), g_settings().DriveAssists.AWD.UseUndersteer,
+        { lang.Tr("awdsettings.onundersteer.desc") });
+    g_menu.FloatOption(lang.Tr("awdsettings.onundersteer") + " min", g_settings().DriveAssists.AWD.UndersteerMin, 0.0f, 90.0f, 1.0f); // degrees
+    g_menu.FloatOption(lang.Tr("awdsettings.onundersteer") + " max", g_settings().DriveAssists.AWD.UndersteerMax, 0.0f, 90.0f, 1.0f); // degrees
 
     const std::vector<std::string> specialFlagsDescr = 
     {
@@ -1778,20 +1762,21 @@ void update_awdsettingsmenu() {
         "Bit 1: Enable torque transfer dial on Wanted188's GT-R R32 (Remember to disable VehFuncs for torque dial)"
     };
     std::string specialFlagsStr = fmt::format("{:08X}", g_settings().DriveAssists.AWD.SpecialFlags);
-    if (g_menu.Option(fmt::format("Special flags (hex): {}", specialFlagsStr), specialFlagsDescr)) {
+    if (g_menu.Option(fmt::format(lang.Tr("awdsettings.specialflags"), specialFlagsStr), specialFlagsDescr)) {
         std::string newFlags = GetKbEntryStr(specialFlagsStr);
         SetFlags(g_settings().DriveAssists.AWD.SpecialFlags, newFlags);
     }
 }
 
 void update_cruisecontrolsettingsmenu() {
-    g_menu.Title("Cruise control");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("ccsettings.title"));
     g_menu.Subtitle(MenuSubtitleConfig());
 
     bool ccActive = CruiseControl::GetActive();
-    if (g_menu.BoolOption("Active", ccActive,
-        { "Activate or deactivate cruise control. Cancelled on throttle, brake or clutch.",
-          "Can also be activated and deactivated from hotkeys or wheel buttons." })) {
+    if (g_menu.BoolOption(lang.Tr("ccsettings.active"), ccActive,
+        { lang.Tr("ccsettings.active.desc1"),
+          lang.Tr("ccsettings.active.desc2") })) {
         CruiseControl::SetActive(ccActive);
     }
 
@@ -1800,55 +1785,56 @@ void update_cruisecontrolsettingsmenu() {
     std::string speedNameUnit = GetSpeedUnitMultiplier(g_settings.HUD.Speedo.Speedo, speedValMul);
     float speedValUnit = speedValRaw * speedValMul;
 
-    if (g_menu.FloatOptionCb(fmt::format("Speed ({})", speedNameUnit), speedValUnit, 0.0f, 500.0f, 5.0f,
+    if (g_menu.FloatOptionCb(fmt::format(lang.Tr("ccsettings.speed"), speedNameUnit), speedValUnit, 0.0f, 500.0f, 5.0f,
         GetKbEntryFloat,
-        { "Speed for cruise control. Speeds higher than vehicle top speed are ignored.",
-          "Can also be changed with hotkeys or wheel buttons." })) {
+        { lang.Tr("ccsettings.speed.desc1"),
+          lang.Tr("ccsettings.speed.desc2") })) {
 
         g_settings().DriveAssists.CruiseControl.Speed = speedValUnit / speedValMul;
     }
 
-    g_menu.FloatOptionCb("Max acceleration", g_settings().DriveAssists.CruiseControl.MaxAcceleration, 0.5f, 40.0f, 0.5f, GetKbEntryFloat,
-        { "How quickly cruise control accelerates or slows down to the desired speed.",
-          "In m/s^2. 9.8 m/s^2 is 1G." });
+    g_menu.FloatOptionCb(lang.Tr("ccsettings.maxaccel"), g_settings().DriveAssists.CruiseControl.MaxAcceleration, 0.5f, 40.0f, 0.5f, GetKbEntryFloat,
+        { lang.Tr("ccsettings.maxaccel.desc1"),
+          lang.Tr("ccsettings.maxaccel.desc2") });
 
-    g_menu.BoolOption("Adaptive", g_settings().DriveAssists.CruiseControl.Adaptive,
-        { "Adapts the speed to the car in front, if there is one." });
+    g_menu.BoolOption(lang.Tr("ccsettings.adaptive"), g_settings().DriveAssists.CruiseControl.Adaptive,
+        { lang.Tr("ccsettings.adaptive.desc") });
 
-    g_menu.FloatOptionCb("Minimum distance", g_settings().DriveAssists.CruiseControl.MinFollowDistance, 1.0f, 50.0f, 1.0f, GetKbEntryFloat,
-        { "Minimum distance to the car ahead, when stopped. In meters.",
-          "Default: 5m" });
+    g_menu.FloatOptionCb(lang.Tr("ccsettings.mindist"), g_settings().DriveAssists.CruiseControl.MinFollowDistance, 1.0f, 50.0f, 1.0f, GetKbEntryFloat,
+        { lang.Tr("ccsettings.mindist.desc1"),
+          lang.Tr("ccsettings.mindist.desc2") });
 
-    g_menu.FloatOptionCb("Maximum distance", g_settings().DriveAssists.CruiseControl.MaxFollowDistance, 50.0f, 200.0f, 0.5f, GetKbEntryFloat,
-        { "Maximum distance where adaptive cruise control starts working. In meters.",
-          "Default: 100m." });
+    g_menu.FloatOptionCb(lang.Tr("ccsettings.maxdist"), g_settings().DriveAssists.CruiseControl.MaxFollowDistance, 50.0f, 200.0f, 0.5f, GetKbEntryFloat,
+        { lang.Tr("ccsettings.maxdist.desc1"),
+          lang.Tr("ccsettings.maxdist.desc2") });
 
-    g_menu.FloatOptionCb("Follow distance", g_settings().DriveAssists.CruiseControl.MinDistanceSpeedMult, 0.1f, 10.0f, 0.1f, GetKbEntryFloat,
-        { "How close to follow the car in front.",
-          "Approximates 'seconds between cars'.",
-          "Lower: follows closer.",
-          "Default: 1.0." });
+    g_menu.FloatOptionCb(lang.Tr("ccsettings.followdist"), g_settings().DriveAssists.CruiseControl.MinDistanceSpeedMult, 0.1f, 10.0f, 0.1f, GetKbEntryFloat,
+        { lang.Tr("ccsettings.followdist.desc1"),
+          lang.Tr("ccsettings.followdist.desc2"),
+          lang.Tr("ccsettings.followdist.desc3"),
+          lang.Tr("ccsettings.followdist.desc4") });
 
-    g_menu.FloatOptionCb("Lifting distance", g_settings().DriveAssists.CruiseControl.MaxDistanceSpeedMult, 0.1f, 10.0f, 0.1f, GetKbEntryFloat,
-        { "How close to the car in front to start reducing speed.",
-          "Approximates 'seconds between cars'.",
-          "Lower: starts matching closer while driving.",
-          "Default: 2.0." });
+    g_menu.FloatOptionCb(lang.Tr("ccsettings.liftdist"), g_settings().DriveAssists.CruiseControl.MaxDistanceSpeedMult, 0.1f, 10.0f, 0.1f, GetKbEntryFloat,
+        { lang.Tr("ccsettings.liftdist.desc1"),
+          lang.Tr("ccsettings.liftdist.desc2"),
+          lang.Tr("ccsettings.liftdist.desc3"),
+          lang.Tr("ccsettings.liftdist.desc4") });
 
-    g_menu.FloatOptionCb("Start brake speed margin", g_settings().DriveAssists.CruiseControl.MinDeltaBrakeMult, 0.1f, 10.0f, 0.1f, GetKbEntryFloat,
-        { "How soon to start braking for the car in front.",
-          "Higher: Brake for a smaller speed difference.",
-          "Default: 2.4." });
+    g_menu.FloatOptionCb(lang.Tr("ccsettings.startbrake"), g_settings().DriveAssists.CruiseControl.MinDeltaBrakeMult, 0.1f, 10.0f, 0.1f, GetKbEntryFloat,
+        { lang.Tr("ccsettings.startbrake.desc1"),
+          lang.Tr("ccsettings.startbrake.desc2"),
+          lang.Tr("ccsettings.startbrake.desc3") });
 
-    g_menu.FloatOptionCb("Full brake speed margin", g_settings().DriveAssists.CruiseControl.MaxDeltaBrakeMult, 0.1f, 10.0f, 0.1f, GetKbEntryFloat,
-        { "How soon to fully brake for the car in front.",
-          "Higher: Brake harder for a smaller speed difference.",
-          "Keep lower than the above option.",
-          "Default: 1.2." });
+    g_menu.FloatOptionCb(lang.Tr("ccsettings.fullbrake"), g_settings().DriveAssists.CruiseControl.MaxDeltaBrakeMult, 0.1f, 10.0f, 0.1f, GetKbEntryFloat,
+        { lang.Tr("ccsettings.fullbrake.desc1"),
+          lang.Tr("ccsettings.fullbrake.desc2"),
+          lang.Tr("ccsettings.fullbrake.desc3"),
+          lang.Tr("ccsettings.fullbrake.desc4") });
 }
 
 void update_speedlimitersettingsmenu() {
-    g_menu.Title("Speed limiter");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("speedlimiter.title"));
     g_menu.Subtitle(MenuSubtitleConfig());
 
     float speedValMul;
@@ -1856,150 +1842,155 @@ void update_speedlimitersettingsmenu() {
     std::string speedNameUnit = GetSpeedUnitMultiplier(g_settings.HUD.Speedo.Speedo, speedValMul);
     float speedValUnit = speedValRaw * speedValMul;
 
-    if (g_menu.FloatOptionCb(fmt::format("Max speed ({})", speedNameUnit), speedValUnit, 0.0f, 500.0f, 5.0f,
+    if (g_menu.FloatOptionCb(fmt::format(lang.Tr("speedlimiter.maxspeed"), speedNameUnit), speedValUnit, 0.0f, 500.0f, 5.0f,
         GetKbEntryFloat,
-        { "Electronically limit speed to this." })) {
+        { lang.Tr("speedlimiter.maxspeed.desc") })) {
 
         g_settings().MTOptions.SpeedLimiter.Speed = speedValUnit / speedValMul;
     }
 }
 
 void update_gameassistmenu() {
-    g_menu.Title("Gameplay assists");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("gameassist.title"));
     g_menu.Subtitle("");
 
-    g_menu.BoolOption("Default neutral gear", g_settings.GameAssists.DefaultNeutral,
-        { "The car will be in neutral when you get in." });
+    g_menu.BoolOption(lang.Tr("gameassist.defaultneutral"), g_settings.GameAssists.DefaultNeutral,
+        { lang.Tr("gameassist.defaultneutral.desc") });
 
-    g_menu.BoolOption("Disable autostart", g_settings.GameAssists.DisableAutostart,
-        { "The character will not start the vehicle when getting in." });
+    g_menu.BoolOption(lang.Tr("gameassist.disableautostart"), g_settings.GameAssists.DisableAutostart,
+        { lang.Tr("gameassist.disableautostart.desc") });
 
-    g_menu.BoolOption("Leave engine running", g_settings.GameAssists.LeaveEngineRunning,
-        { "The character will not turn the engine off when exiting the car, if you use a short press." });
+    g_menu.BoolOption(lang.Tr("gameassist.leaveengine"), g_settings.GameAssists.LeaveEngineRunning,
+        { lang.Tr("gameassist.leaveengine.desc") });
 
-    g_menu.BoolOption("Simplified bike", g_settings.GameAssists.SimpleBike,
-        { "Disables bike engine stalling and the clutch bite simulation." });
+    g_menu.BoolOption(lang.Tr("gameassist.simplebike"), g_settings.GameAssists.SimpleBike,
+        { lang.Tr("gameassist.simplebike.desc") });
 
-    g_menu.BoolOption("Hill gravity workaround", g_settings.GameAssists.HillGravity,
-        { "Gives the car a push to overcome the games' default brakes when stopped." });
+    g_menu.BoolOption(lang.Tr("gameassist.hillgravity"), g_settings.GameAssists.HillGravity,
+        { lang.Tr("gameassist.hillgravity.desc") });
 
-    g_menu.BoolOption("Auto 1st gear", g_settings.GameAssists.AutoGear1,
-        { "Automatically switch to first gear when the car reaches a standstill." });
+    g_menu.BoolOption(lang.Tr("gameassist.autogear1"), g_settings.GameAssists.AutoGear1,
+        { lang.Tr("gameassist.autogear1.desc") });
 
-    g_menu.BoolOption("Auto look back", g_settings.GameAssists.AutoLookBack,
-        { "Automatically look back whenever in reverse gear." });
+    g_menu.BoolOption(lang.Tr("gameassist.autolookback"), g_settings.GameAssists.AutoLookBack,
+        { lang.Tr("gameassist.autolookback.desc") });
 
-    g_menu.BoolOption("Clutch & throttle start", g_settings.GameAssists.ThrottleStart,
-        { "Allow starting the engine by pressing clutch and throttle simultaneously." });
+    g_menu.BoolOption(lang.Tr("gameassist.throttlestart"), g_settings.GameAssists.ThrottleStart,
+        { lang.Tr("gameassist.throttlestart.desc") });
 }
 
 void update_steeringassistmenu() {
-    g_menu.Title("Steering assists");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("steerassist.title"));
     g_menu.Subtitle("");
 
     std::vector<std::string> steeringModeDescription;
     switch(g_settings.CustomSteering.Mode) {
     case 0:
-        steeringModeDescription.emplace_back("Default: Original game steering.");
-        steeringModeDescription.emplace_back("Only applies Steering Multiplier.");
+        steeringModeDescription.emplace_back(lang.Tr("steerassist.mode.desc_default1"));
+        steeringModeDescription.emplace_back(lang.Tr("steerassist.mode.desc_default2"));
         break;
     case 1:
-        steeringModeDescription.emplace_back("Enhanced: Custom countersteer, disabled magic forces.");
-        steeringModeDescription.emplace_back("Applies all settings below.");
+        steeringModeDescription.emplace_back(lang.Tr("steerassist.mode.desc_enhanced1"));
+        steeringModeDescription.emplace_back(lang.Tr("steerassist.mode.desc_enhanced2"));
         break;
     default:
-        steeringModeDescription.emplace_back("Invalid option?");
+        steeringModeDescription.emplace_back(lang.Tr("steerassist.mode.desc_invalid"));
     }
-    g_menu.StringArray("Steering mode", { "Default", "Enhanced" }, g_settings.CustomSteering.Mode, 
+    std::vector<std::string> steerModeNames = { lang.Tr("steerassist.mode.default"), lang.Tr("steerassist.mode.enhanced") };
+    g_menu.StringArray(lang.Tr("steerassist.mode"), steerModeNames, g_settings.CustomSteering.Mode, 
         steeringModeDescription);
-    g_menu.FloatOptionCb("Countersteer multiplier", g_settings.CustomSteering.CountersteerMult, 0.0f, 2.0f, 0.05f, GetKbEntryFloat,
-        { "How much countersteer should be given." });
-    g_menu.FloatOptionCb("Countersteer limit", g_settings.CustomSteering.CountersteerLimit, 0.0f, 360.0f, 1.0f, GetKbEntryFloat,
-        { "Maximum angle in degrees for automatic countersteering. Game default is 15 degrees." });
-    g_menu.BoolOption("No reduction on handbrake", g_settings.CustomSteering.NoReductionHandbrake,
-        { "Disable reduction when the handbrake is used." });
-    g_menu.FloatOptionCb("Steering gamma", g_settings.CustomSteering.Gamma, 0.01f, 5.0f, 0.01f, GetKbEntryFloat,
-        { "Change linearity of steering input." });
-    g_menu.FloatOptionCb("Steering time", g_settings.CustomSteering.SteerTime, 0.000001f, 0.90f, 0.000001f,
+    g_menu.FloatOptionCb(lang.Tr("steerassist.countermult"), g_settings.CustomSteering.CountersteerMult, 0.0f, 2.0f, 0.05f, GetKbEntryFloat,
+        { lang.Tr("steerassist.countermult.desc") });
+    g_menu.FloatOptionCb(lang.Tr("steerassist.counterlimit"), g_settings.CustomSteering.CountersteerLimit, 0.0f, 360.0f, 1.0f, GetKbEntryFloat,
+        { lang.Tr("steerassist.counterlimit.desc") });
+    g_menu.BoolOption(lang.Tr("steerassist.noredhandbrake"), g_settings.CustomSteering.NoReductionHandbrake,
+        { lang.Tr("steerassist.noredhandbrake.desc") });
+    g_menu.FloatOptionCb(lang.Tr("steerassist.gamma"), g_settings.CustomSteering.Gamma, 0.01f, 5.0f, 0.01f, GetKbEntryFloat,
+        { lang.Tr("steerassist.gamma.desc") });
+    g_menu.FloatOptionCb(lang.Tr("steerassist.steertime"), g_settings.CustomSteering.SteerTime, 0.000001f, 0.90f, 0.000001f,
         GetKbEntryFloat,
-        { "The lower the value, the faster the steering is.",
-          "Press Enter to enter a value manually." });
-    g_menu.FloatOptionCb("Centering time", g_settings.CustomSteering.CenterTime, 0.000001f, 0.99f, 0.000001f,
+        { lang.Tr("steerassist.steertime.desc1"),
+          lang.Tr("steerassist.steertime.desc2") });
+    g_menu.FloatOptionCb(lang.Tr("steerassist.centertime"), g_settings.CustomSteering.CenterTime, 0.000001f, 0.99f, 0.000001f,
         GetKbEntryFloat,
-        { "The lower the value, the faster the wheels return to center after letting go.",
-          "Press Enter to enter a value manually." });
+        { lang.Tr("steerassist.centertime.desc1"),
+          lang.Tr("steerassist.centertime.desc2") });
 
-    g_menu.MenuOption("Mouse steering options", "mousesteeringoptionsmenu");
+    g_menu.MenuOption(lang.Tr("steerassist.mouseoptions"), "mousesteeringoptionsmenu");
 }
 
 void update_mousesteeringoptionsmenu() {
-    g_menu.Title("Mouse steering");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("mousesteer.title"));
     g_menu.Subtitle("");
 
-    g_menu.BoolOption("Enable mouse steering", g_settings.CustomSteering.Mouse.Enable,
-        { "When enabled, hold the mouse steering override button to use mouse steering." });
+    g_menu.BoolOption(lang.Tr("mousesteer.enable"), g_settings.CustomSteering.Mouse.Enable,
+        { lang.Tr("mousesteer.enable.desc") });
 
-    g_menu.FloatOptionCb("Mouse sensitivity", g_settings.CustomSteering.Mouse.Sensitivity, 0.05f, 2.0f, 0.05f, GetKbEntryFloat,
-        { "Sensitivity for mouse steering." });
+    g_menu.FloatOptionCb(lang.Tr("mousesteer.sensitivity"), g_settings.CustomSteering.Mouse.Sensitivity, 0.05f, 2.0f, 0.05f, GetKbEntryFloat,
+        { lang.Tr("mousesteer.sensitivity.desc") });
 
-    g_menu.BoolOption("Disable countersteer", g_settings.CustomSteering.Mouse.DisableSteerAssist,
-        { "Disables countersteer assist." });
+    g_menu.BoolOption(lang.Tr("mousesteer.disablecounter"), g_settings.CustomSteering.Mouse.DisableSteerAssist,
+        { lang.Tr("mousesteer.disablecounter.desc") });
 
-    g_menu.BoolOption("Disable reduction", g_settings.CustomSteering.Mouse.DisableReduction,
-        { "Disables countersteer assist." });
+    g_menu.BoolOption(lang.Tr("mousesteer.disablereduction"), g_settings.CustomSteering.Mouse.DisableReduction,
+        { lang.Tr("mousesteer.disablereduction.desc") });
 }
 
 void update_miscoptionsmenu() {
-    g_menu.Title("Misc options");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("miscoptions.title"));
     g_menu.Subtitle("");
 
     if (SteeringAnimation::FileProblem()) {
-        g_menu.Option("Animation file error", NativeMenu::solidRed,
-            { "An error occurred reading the animation file. Check Gears.log for more details." });
+        g_menu.Option(lang.Tr("miscoptions.animerror"), NativeMenu::solidRed,
+            { lang.Tr("miscoptions.animerror.desc") });
     }
     else {
-        g_menu.BoolOption("Sync steering animation", g_settings.Misc.SyncAnimations,
-            { "Synchronize animations with wheel rotation using third-person animations.",
-              "Only active for synced steering wheel rotation or custom controller wheel rotation.",
-              "Limits FPV camera angle, recommended to enable custom FPV camera.",
-              "Check animations.yml for more details!" });
+        g_menu.BoolOption(lang.Tr("miscoptions.syncanim"), g_settings.Misc.SyncAnimations,
+            { lang.Tr("miscoptions.syncanim.desc1"),
+              lang.Tr("miscoptions.syncanim.desc2"),
+              lang.Tr("miscoptions.syncanim.desc3"),
+              lang.Tr("miscoptions.syncanim.desc4") });
     }
 
-    if (g_menu.BoolOption("Hide player in FPV", g_settings.Misc.HidePlayerInFPV,
-        { "Hides the player in first person view.",
-          "If you use another script that does the same, "
-            "enable [Disable Player Hiding] in dev settings."})) {
+    if (g_menu.BoolOption(lang.Tr("miscoptions.hideplayerfpv"), g_settings.Misc.HidePlayerInFPV,
+        { lang.Tr("miscoptions.hideplayerfpv.desc1"),
+          lang.Tr("miscoptions.hideplayerfpv.desc2")})) {
         functionHidePlayerInFPV(true);
     }
 
-    g_menu.BoolOption("Hide wheel in FPV", g_settings.Misc.HideWheelInFPV);
+    g_menu.BoolOption(lang.Tr("miscoptions.hidewheelfpv"), g_settings.Misc.HideWheelInFPV);
 
-    g_menu.BoolOption("Enable dashboard extensions", g_settings.Misc.DashExtensions,
-        { "If DashHook is installed, the script controls some dashboard lights such as the ABS light." });
+    g_menu.BoolOption(lang.Tr("miscoptions.dashext"), g_settings.Misc.DashExtensions,
+        { lang.Tr("miscoptions.dashext.desc") });
 
-    if (g_menu.BoolOption("Enable UDP telemetry", g_settings.Misc.UDPTelemetry,
-        { "Allows programs like SimHub to use data from this script.",
-            "This script uses the DIRT 4 format for telemetry data.",
+    if (g_menu.BoolOption(lang.Tr("miscoptions.udp"), g_settings.Misc.UDPTelemetry,
+        { lang.Tr("miscoptions.udp.desc1"),
+            lang.Tr("miscoptions.udp.desc2"),
             fmt::format("Endpoint: {}:{}", g_settings.Misc.UDPAddress, g_settings.Misc.UDPPort),
-            "Restart the game if the endpoints are changed." })) {
+            lang.Tr("miscoptions.udp.desc3") })) {
         StartUDPTelemetry();
     }
 }
 
 void update_devoptionsmenu() {
-    g_menu.Title("Developer options");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("devoptions.title"));
     g_menu.Subtitle("");
 
-    g_menu.MenuOption("Debug settings", "debugmenu");
+    g_menu.MenuOption(lang.Tr("devoptions.debug"), "debugmenu");
 
-    g_menu.MenuOption("Metrics settings", "metricsmenu",
-        { "Show the G-Force graph and speed timers." });
+    g_menu.MenuOption(lang.Tr("devoptions.metrics"), "metricsmenu",
+        { lang.Tr("devoptions.metrics.desc") });
 
-    g_menu.MenuOption("Compatibility settings", "compatmenu",
-        { "Disable various features to improve compatibility." });
+    g_menu.MenuOption(lang.Tr("devoptions.compat"), "compatmenu",
+        { lang.Tr("devoptions.compat.desc") });
 
-    if (g_menu.Option("Export base VehicleConfig", 
-        { "Exports the base configuration to the Vehicles folder. If you lost it, or something." })) {
+    if (g_menu.Option(lang.Tr("devoptions.exportvehconfig"), 
+        { lang.Tr("devoptions.exportvehconfig.desc") })) {
         const std::string saveFile = "baseVehicleConfig";
         const std::string vehConfigDir = Paths::GetModPath() + "\\Vehicles";
         const std::string finalFile = fmt::format("{}\\{}.ini", vehConfigDir, saveFile);
@@ -2011,51 +2002,51 @@ void update_devoptionsmenu() {
         config.SaveSettings(&config, finalFile);
     }
 
-    g_menu.BoolOption("Enable update check", g_settings.Update.EnableUpdate,
-        { "Check for mod updates."});
+    g_menu.BoolOption(lang.Tr("devoptions.enableupdate"), g_settings.Update.EnableUpdate,
+        { lang.Tr("devoptions.enableupdate.desc")});
 
-    if (g_menu.Option("Check for updates", { "Manually check for updates. "
-        "Re-enables update checking and clears ignored update." })) {
+    if (g_menu.Option(lang.Tr("devoptions.checkupdate"), { lang.Tr("devoptions.checkupdate.desc") })) {
         g_settings.Update.EnableUpdate = true;
         g_settings.Update.IgnoredVersion = "v0.0.0";
 
         threadCheckUpdate(0);
     }
 
-    g_menu.Option("Mod path",
-        { "This script currently uses the following folder to store data:",
+    g_menu.Option(lang.Tr("devoptions.modpath"),
+        { lang.Tr("devoptions.modpath.desc1"),
           fmt::format("{}", Paths::GetModPath()) });
 }
 
 void update_debugmenu() {
-    g_menu.Title("Debug settings");
-    g_menu.Subtitle("Under the hood");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("debugmenu.title"));
+    g_menu.Subtitle(lang.Tr("debugmenu.subtitle"));
 
-    g_menu.BoolOption("Show legacy FFB options", g_settings.Debug.ShowAdvancedFFBOptions,
-        { "Show legacy options in FFB menu." });
-    g_menu.BoolOption("Display debug info", g_settings.Debug.DisplayInfo,
-        { "Show all detailed technical info of the gearbox and inputs calculations." });
-    g_menu.BoolOption("Display wheel drive info", g_settings.Debug.DisplayWheelInfo,
-        { "Show wheel info with power, brake, .",
-          "[TCS: Yellow] [ESP: Blue] [ABS: Red] [Locked up: Purple] [Off ground: Transparent]"});
-    g_menu.BoolOption("Display wheel material info", g_settings.Debug.DisplayMaterialInfo,
-        { "Show material info and various material multipliers.",
-          "Note: WET_GRIP is displayed as 1.0f - (WET_GRIP * Wetness)." });
-    g_menu.BoolOption("Display wheel traction info", g_settings.Debug.DisplayTractionInfo,
-        { "Show traction/force vectors (?). Green = forward, red = backward." });
-    g_menu.BoolOption("Display gearing info", g_settings.Debug.DisplayGearingInfo,
-        { "Show gear ratios and shift points from auto mode." });
-    g_menu.BoolOption("Show NPC info", g_settings.Debug.DisplayNPCInfo,
-        { "Show vehicle info of NPC vehicles near you." });
+    g_menu.BoolOption(lang.Tr("debugmenu.legacyffb"), g_settings.Debug.ShowAdvancedFFBOptions,
+        { lang.Tr("debugmenu.legacyffb.desc") });
+    g_menu.BoolOption(lang.Tr("debugmenu.displayinfo"), g_settings.Debug.DisplayInfo,
+        { lang.Tr("debugmenu.displayinfo.desc") });
+    g_menu.BoolOption(lang.Tr("debugmenu.wheelinfo"), g_settings.Debug.DisplayWheelInfo,
+        { lang.Tr("debugmenu.wheelinfo.desc1"),
+          lang.Tr("debugmenu.wheelinfo.desc2")});
+    g_menu.BoolOption(lang.Tr("debugmenu.materialinfo"), g_settings.Debug.DisplayMaterialInfo,
+        { lang.Tr("debugmenu.materialinfo.desc1"),
+          lang.Tr("debugmenu.materialinfo.desc2") });
+    g_menu.BoolOption(lang.Tr("debugmenu.tractioninfo"), g_settings.Debug.DisplayTractionInfo,
+        { lang.Tr("debugmenu.tractioninfo.desc") });
+    g_menu.BoolOption(lang.Tr("debugmenu.gearinginfo"), g_settings.Debug.DisplayGearingInfo,
+        { lang.Tr("debugmenu.gearinginfo.desc") });
+    g_menu.BoolOption(lang.Tr("debugmenu.npcinfo"), g_settings.Debug.DisplayNPCInfo,
+        { lang.Tr("debugmenu.npcinfo.desc") });
 
     if (SteeringAnimation::FileProblem()) {
-        g_menu.Option("Animation file error", NativeMenu::solidRed, 
-            { "An error occurred reading the animation file. Check Gears.log for more details." });
+        g_menu.Option(lang.Tr("miscoptions.animerror"), NativeMenu::solidRed, 
+            { lang.Tr("miscoptions.animerror.desc") });
     }
     else {
         std::vector <std::string> extras;
 
-        extras.emplace_back("Available animation dictionaries:");
+        extras.emplace_back(lang.Tr("debugmenu.animavailable"));
 
         const auto& anims = SteeringAnimation::GetAnimations();
         const size_t index = SteeringAnimation::GetAnimationIndex();
@@ -2069,13 +2060,13 @@ void update_debugmenu() {
         }
 
         extras.emplace_back("");
-        extras.emplace_back("* marks active dictionary.");
+        extras.emplace_back(lang.Tr("debugmenu.animactive"));
         if (index >= SteeringAnimation::GetAnimations().size()) {
-            extras.push_back(fmt::format("Index out of range ({})", index));
+            extras.push_back(fmt::format(lang.Tr("debugmenu.animoutofrange"), index));
         }
 
         extras.emplace_back("");
-        extras.emplace_back("Press left/right to change animation manually.");
+        extras.emplace_back(lang.Tr("debugmenu.animchange"));
 
         std::function<void()> onLeft = [index, anims]() {
             if (!anims.empty()) {
@@ -2101,9 +2092,9 @@ void update_debugmenu() {
             }
         };
 
-        if (g_menu.OptionPlus("Animation info", extras,
+        if (g_menu.OptionPlus(lang.Tr("debugmenu.animinfo"), extras,
             nullptr, onRight, onLeft, "Animations", 
-            { "Shows current animation override status. Enter to reload." })) {
+            { lang.Tr("debugmenu.animinfo.desc") })) {
             SteeringAnimation::Load();
         }
     }
@@ -2128,8 +2119,8 @@ void update_debugmenu() {
         };
 
         bool selected = false;
-        if (g_menu.OptionPlus("DirectInput devices", diDevicesInfo, 
-            &selected, nullptr, nullptr, "DirectInput info", { "Enter to refresh." })) {
+        if (g_menu.OptionPlus(lang.Tr("debugmenu.didevices"), diDevicesInfo, 
+            &selected, nullptr, nullptr, "DirectInput info", { lang.Tr("debugmenu.didevices.desc") })) {
             fetchInfo(diDevicesInfo);
         }
 
@@ -2138,20 +2129,21 @@ void update_debugmenu() {
         }
     }
 
-    g_menu.BoolOption("Disable general RPM limit", g_settings.Debug.DisableRPMLimit,
-        { "Disables redline RPM limit in all gears, allowing for unlimited acceleration in any gear." });
+    g_menu.BoolOption(lang.Tr("debugmenu.disablerpmlimit"), g_settings.Debug.DisableRPMLimit,
+        { lang.Tr("debugmenu.disablerpmlimit.desc") });
 }
 
 void update_metricsmenu() {
-    g_menu.Title("Metrics settings");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("metricsmenu.title"));
     g_menu.Subtitle("");
 
-    g_menu.BoolOption("Display G force meter", g_settings.Debug.Metrics.GForce.Enable,
-        { "Show a graph with G forces.", 
-            "Change the screen coordinates and sizes in settings_general.ini." });
+    g_menu.BoolOption(lang.Tr("metricsmenu.gforcemeter"), g_settings.Debug.Metrics.GForce.Enable,
+        { lang.Tr("metricsmenu.gforcemeter.desc1"), 
+            lang.Tr("metricsmenu.gforcemeter.desc2") });
 
-    if (g_menu.BoolOption("Enable timers", g_settings.Debug.Metrics.EnableTimers,
-        { "Enable speed timers as defined in settings_general.ini, [DEBUG]. Example:",
+    if (g_menu.BoolOption(lang.Tr("metricsmenu.enabletimers"), g_settings.Debug.Metrics.EnableTimers,
+        { lang.Tr("metricsmenu.enabletimers.desc1"),
             "Timer0Unit = kph",
             "Timer0LimA = 0.0",
             "Timer0LimB = 120.0",
@@ -2173,26 +2165,26 @@ void update_metricsmenu() {
 }
 
 void update_compatmenu() {
-    g_menu.Title("Compatibility settings");
+    auto& lang = LanguageManager::Instance();
+    g_menu.Title(lang.Tr("compatmenu.title"));
     g_menu.Subtitle("");
 
-    g_menu.BoolOption("Disable NPC gearbox", g_settings.Debug.DisableNPCGearbox,
-        { "Disable the script from controlling NPC vehicle gearboxes, when Manual Transmission is enabled.",
-            "Disabling makes NPC vehicles drive unpredictably and never shift up.",
-            "Use the script API to disable script control on a per-vehicle basis, "
-            "if you're a developer and wish to implement your own NPC vehicle shifting logic." });
+    g_menu.BoolOption(lang.Tr("compatmenu.disableNPCGearbox"), g_settings.Debug.DisableNPCGearbox,
+        { lang.Tr("compatmenu.disableNPCGearbox.desc1"),
+            lang.Tr("compatmenu.disableNPCGearbox.desc2"),
+            lang.Tr("compatmenu.disableNPCGearbox.desc3") });
 
-    g_menu.BoolOption("Disable NPC brakes", g_settings.Debug.DisableNPCBrake,
-        { "While ABS, TCS or ESC are active, NPC braking is replaced by script.",
-            "Disabling hampers AI braking, but can improve performance." });
+    g_menu.BoolOption(lang.Tr("compatmenu.disableNPCBrake"), g_settings.Debug.DisableNPCBrake,
+        { lang.Tr("compatmenu.disableNPCBrake.desc1"),
+            lang.Tr("compatmenu.disableNPCBrake.desc2") });
 
-    g_menu.BoolOption("Disable input detection", g_settings.Debug.DisableInputDetect,
-        {  "Disable automatic detection and switching of input method.",
-            "Allows for manual input selection on the main menu." });
+    g_menu.BoolOption(lang.Tr("compatmenu.disableInputDetect"), g_settings.Debug.DisableInputDetect,
+        {  lang.Tr("compatmenu.disableInputDetect.desc1"),
+            lang.Tr("compatmenu.disableInputDetect.desc2") });
 
-    g_menu.BoolOption("Disable player hiding", g_settings.Debug.DisablePlayerHide,
-        { "Disables toggling player visibility by script.",
-            "Useful when another script hides the player." });
+    g_menu.BoolOption(lang.Tr("compatmenu.disablePlayerHide"), g_settings.Debug.DisablePlayerHide,
+        { lang.Tr("compatmenu.disablePlayerHide.desc1"),
+            lang.Tr("compatmenu.disablePlayerHide.desc2") });
 }
 
 void update_menu() {

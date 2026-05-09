@@ -71,7 +71,7 @@ Always include `Gears.log`. If additional hardware, like a steering wheel is inv
 
 ## Language support
 
-Untill now ,only support 2 language:
+Untill now ,only support those two languages:
 
 1. en-US
 2. zh-CN
